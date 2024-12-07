@@ -1,7 +1,7 @@
 import torch
+import wandb
 import transformers
 from transformers import AutoTokenizer
-from models import *
 import os
 import time
 import json
@@ -64,6 +64,14 @@ parser.add_argument('--num_iters', type=int, default=10,
 parser.add_argument('--ec_variant', type=str, default="RandEC", choices=["RandEC", "GreedyEC", "GradEC", "GreedyGradEC"],
                     help='variant of EC to evaluate for ROC')
 
+# -- Wandb logging arguments -- #
+parser.add_argument('--wandb_log', action='store_true',
+                    help='flag for logging results to wandb')
+parser.add_argument('--wandb_project', type=str, default="llm-hindi-safety-filter",
+                    help='name of the wandb project')
+parser.add_argument('--wandb_entity', type=str, default="patchtst-flashattention",
+                    help='name of the wandb entity')
+
 args = parser.parse_args()
 
 num_prompts = args.num_prompts
@@ -83,6 +91,9 @@ llm_name = args.llm_name
 attack = args.attack
 ec_variant = args.ec_variant
 adv_prompts_dir = args.adv_prompts_dir
+wandb_log = args.wandb_log
+wandb_project = args.wandb_project
+wandb_entity = args.wandb_entity
 
 print("\n* * * * * * Experiment Details * * * * * *")
 if torch.cuda.is_available():
@@ -113,6 +124,28 @@ if eval_type == "roc_curve":
     print("EC variant: " + ec_variant)
     print("Adversarial prompts directory: " + adv_prompts_dir)
 print("* * * * * * * * * * ** * * * * * * * * * *\n", flush=True)
+
+# Log the experiment configuration to wandb
+if wandb_log:
+    wandb.init(project=wandb_project, entity=wandb_entity)
+    wandb.config.update({
+        "num_prompts": num_prompts,
+        "mode": mode,
+        "eval_type": eval_type,
+        "max_erase": max_erase,
+        "num_adv": num_adv,
+        "attack": attack,
+        "ec_variant": ec_variant,
+        "num_iters": num_iters,
+        "randomize": randomize,
+        "sampling_ratio": sampling_ratio,
+        "use_classifier": use_classifier,
+        "model_wt_path": model_wt_path,
+        "safe_prompts_file": safe_prompts_file,
+        "harmful_prompts_file": harmful_prompts_file,
+        "llm_name": llm_name,
+        "adv_prompts_dir": adv_prompts_dir,
+    })
 
 # Create results directory if it doesn't exist
 # if use_classifier:
@@ -253,6 +286,12 @@ if eval_type == "safe":
             + f' Detected safe = {percent_safe:5.1f}%' \
             + f' Time/prompt = {time_per_prompt:5.1f}s', end="\r", flush=True)
         
+        if wandb_log:
+            wandb.log({
+                f"percent_safe_prompt{i}": percent_safe,
+                f"time_per_prompt_prompt{i}": time_per_prompt
+            })
+        
     # Compute standard error of the average time per prompt
     time_per_prompt_se = torch.tensor(time_list).std().item() / (num_prompts ** 0.5)
 
@@ -266,7 +305,12 @@ if eval_type == "safe":
         results[str(dict(num_adv = num_adv))][str(dict(max_erase = max_erase))] = dict(percent_safe = percent_safe, time_per_prompt = time_per_prompt, percent_safe_se = percent_safe_se, time_per_prompt_se = time_per_prompt_se)
     else:
         results[str(dict(max_erase = max_erase))] = dict(percent_safe = percent_safe, time_per_prompt = time_per_prompt, percent_safe_se = percent_safe_se, time_per_prompt_se = time_per_prompt_se)
-    # print(results)
+    
+    if wandb_log:
+        wandb.log({
+            "percent_safe_standard_error": percent_safe_se,
+            "time_per_prompt_standard_error": time_per_prompt_se
+        })
 
 elif eval_type == "empirical":
     # Empirical performance on adversarial prompts
@@ -323,11 +367,23 @@ elif eval_type == "empirical":
                 + f' Detected harmful = {percent_harmful:5.1f}%' \
                 + f' Time/prompt = {time_per_prompt:5.1f}s', end="\r", flush=True)
             
+            if wandb_log:
+                wandb.log({
+                    f"percent_harmful_prompt{i}": percent_harmful,
+                    f"time_per_prompt_prompt{i}": time_per_prompt
+                })
+            
         # Compute standard error of the average time per prompt
         time_per_prompt_se = torch.tensor(time_list).std().item() / (num_prompts ** 0.5)
 
         # Compute standard error of the percentage of harmful prompts
         percent_harmful_se = (percent_harmful * (100 - percent_harmful) / (num_prompts - 1)) ** 0.5
+
+        if wandb_log:
+            wandb.log({
+                "percent_harmful_standard_error": percent_harmful_se,
+                "time_per_prompt_standard_error": time_per_prompt_se
+            })
 
         print("")
             
@@ -380,6 +436,12 @@ elif eval_type == "grad_ec":
                 + f' Detected harmful = {percent_harmful:5.1f}%' \
                 + f' Time/prompt = {time_per_prompt:5.1f}s', end="\r", flush=True)
             
+            if wandb_log:
+                wandb.log({
+                    f"percent_harmful_prompt{i}": percent_harmful,
+                    f"time_per_prompt_prompt{i}": time_per_prompt
+                })
+            
         print("")
 
         # Compute standard error of the average time per prompt
@@ -387,6 +449,12 @@ elif eval_type == "grad_ec":
 
         # Compute standard error of the percentage of harmful prompts
         percent_harmful_se = (percent_harmful * (100 - percent_harmful) / (num_prompts - 1)) ** 0.5
+
+        if wandb_log:
+            wandb.log({
+                "percent_harmful_standard_error": percent_harmful_se,
+                "time_per_prompt_standard_error": time_per_prompt_se
+            })
 
         # Save results
         emp_results[str(dict(adv_tok = adv_tok))] = dict(percent_harmful = percent_harmful, time_per_prompt = time_per_prompt, percent_harmful_se = percent_harmful_se, time_per_prompt_se = time_per_prompt_se)
@@ -445,6 +513,12 @@ elif eval_type == "greedy_ec":
                 + f' Detected harmful = {percent_harmful:5.1f}%' \
                 + f' Time/prompt = {time_per_prompt:5.1f}s', end="\r", flush=True)
             
+            if wandb_log:
+                wandb.log({
+                    f"percent_harmful_prompt{i}": percent_harmful,
+                    f"time_per_prompt_prompt{i}": time_per_prompt
+                })
+            
         print("")
 
         # Compute standard error of the average time per prompt
@@ -452,6 +526,12 @@ elif eval_type == "greedy_ec":
 
         # Compute standard error of the percentage of harmful prompts
         percent_harmful_se = (percent_harmful * (100 - percent_harmful) / (num_prompts - 1)) ** 0.5
+
+        if wandb_log:
+            wandb.log({
+                "percent_harmful_standard_error": percent_harmful_se,
+                "time_per_prompt_standard_error": time_per_prompt_se
+            })
 
         # Save results
         emp_results[str(dict(adv_tok = adv_tok))] = dict(percent_harmful = percent_harmful, time_per_prompt = time_per_prompt, percent_harmful_se = percent_harmful_se, time_per_prompt_se = time_per_prompt_se)
@@ -572,6 +652,9 @@ elif eval_type == "roc_curve":
 
     results[ec_variant] = roc
 
+    if wandb_log:
+        wandb.log(roc)
+
 elif eval_type == "smoothing":
     # Smoothing-based certificates on harmful prompts
     print("Evaluating smoothing-based certificates on harmful prompts from: " + harmful_prompts_file)
@@ -602,7 +685,11 @@ elif eval_type == "smoothing":
         certified_accuracy[i] = sum([length >= i for length in certified_length]) / num_prompts * 100
 
     results[str(dict(max_erase = max_erase))] = dict(certified_accuracy = certified_accuracy)
-    
+
+    if wandb_log:
+        wandb.log({
+            "certified_accuracy": certified_accuracy
+        })
 
 elif eval_type == "harmful":
     # Harmful prompts
@@ -647,9 +734,17 @@ elif eval_type == "harmful":
     # Save results
     results["percent_harmful"] = percent_harmful
 
+    if wandb_log:
+        wandb.log({
+            "percent_harmful": percent_harmful
+        })
+
 print("")
 
 # Save results
 print("Saving results to " + results_file)
 with open(results_file, "w") as f:
     json.dump(results, f, indent=2)
+
+if wandb_log:
+    wandb.finish()
