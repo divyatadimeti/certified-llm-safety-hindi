@@ -1,7 +1,7 @@
 import torch
 import transformers
 from transformers import AutoTokenizer
-from models import *
+#from models import *
 import os
 import time
 import json
@@ -53,7 +53,7 @@ parser.add_argument('--results_dir', type=str, default="results",
                     help='directory to save results')
 parser.add_argument('--use_classifier', action='store_true',
                     help='flag for using a custom trained safety filter')
-parser.add_argument('--model_wt_path', type=str, default='models/distillbert_saved_weights.pt',
+parser.add_argument('--model_wt_path', type=str, default="",
                     help='path to the model weights of the trained safety filter')
 parser.add_argument('--llm_name', type=str, default="Llama-2", choices=["Llama-2", "Llama-2-13B", "Llama-3", "GPT-3.5"],
                     help='name of the LLM model (used only when use_classifier=False)')
@@ -150,7 +150,8 @@ if use_classifier:
 
     # Load model weights
     # path = 'models/distillbert_saved_weights.pt'
-    model.load_state_dict(torch.load(model_wt_path))
+    if model_wt_path is not "":
+        model.load_state_dict(torch.load(model_wt_path))
     model.eval()
 
     # Create a text classification pipeline
@@ -162,16 +163,15 @@ else:
         # Load model and tokenizer
         model = "meta-llama/Llama-2-7b-chat-hf"
         # commit_id = "main"        # to use the latest version
-        commit_id = "08751db2aca9bf2f7f80d2e516117a53d7450235"      # to reproduce the results in our paper
+        # commit_id = "08751db2aca9bf2f7f80d2e516117a53d7450235"      # to reproduce the results in our paper
 
         print(f'Loading model {model}...')
-        tokenizer = AutoTokenizer.from_pretrained(model, revision=commit_id)
+        tokenizer = AutoTokenizer.from_pretrained(model)
         pipeline = transformers.pipeline(
             "text-generation",
             model=model,
             torch_dtype=torch.float16,
-            device_map="auto",
-            revision=commit_id
+            device_map="auto"
         )
 
     elif llm_name == "Llama-2-13B":
