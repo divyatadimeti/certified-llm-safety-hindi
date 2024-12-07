@@ -731,6 +731,12 @@ elif eval_type == "harmful":
             + f' Detected harmful = {percent_harmful:5.1f}%' \
             + f' Time/prompt = {time_per_prompt:5.1f}s', end="\r", flush=True)
         
+        if wandb_log:
+            wandb.log({
+                f"percent_harmful_prompt{i}": percent_harmful,
+                f"time_per_prompt_prompt{i}": time_per_prompt
+            })
+        
     # Save results
     results["percent_harmful"] = percent_harmful
 
