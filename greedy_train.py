@@ -1,5 +1,6 @@
 # Train the DistilBERT classifier for the greedy approach
 
+import wandb
 import numpy as np
 
 import torch
@@ -114,6 +115,9 @@ parser.add_argument('--harmful_train', type=str, default='data/harmful_prompts_t
 parser.add_argument('--safe_test', type=str, default='data/safe_prompts_test.txt', help='File containing safe prompts for testing')
 parser.add_argument('--harmful_test', type=str, default='data/harmful_prompts_test.txt', help='File containing harmful prompts for testing')
 parser.add_argument('--save_path', type=str, default='models/distilbert_greedy.pt', help='Path to save the model')
+parser.add_argument('--wandb_log', action='store_true', help='Flag for logging results to wandb')
+parser.add_argument('--wandb_project', type=str, default='llm-hindi-safety-filter', help='Name of the wandb project')
+parser.add_argument('--wandb_entity', type=str, default='patchtst-flashattention', help='Name of the wandb entity')
 
 args = parser.parse_args()
 
@@ -124,6 +128,19 @@ test_iter = 9
 num_epochs = 30
 num_runs = 10
 train_threshold = 0.7
+wandb_log = args.wandb_log
+
+# Log the experiment configuration to wandb
+if wandb_log:
+    wandb.init(project=args.wandb_project, entity=args.wandb_entity)
+    wandb.config.update({
+        "batch_size": batch_size,
+        "train_iter": train_iter,
+        "test_iter": test_iter,
+        "num_epochs": num_epochs,
+        "num_runs": num_runs,
+        "train_threshold": train_threshold
+    })
 
 # Read the data
 safe_train = read_text(args.safe_train)
@@ -203,6 +220,12 @@ for run in range(num_runs):
 
         print(f"    Epoch {epoch+1}, Loss: {total_loss:.2f}", flush=True)
 
+        if wandb_log:
+            wandb.log({
+                "epoch": epoch+1,
+                "loss": total_loss
+            })
+
         # Validation
         model.eval()
         val_loss = 0
@@ -242,6 +265,13 @@ for run in range(num_runs):
 
         acc = correct/total
         print(f"    Validation Loss: {val_loss:.2f}, Accuracy: {acc * 100:.2f}%, Safe Incorrect: {safe_incorrect/safe_total * 100:.2f}%", flush=True)
+
+        if wandb_log:
+            wandb.log({
+                "val_loss": val_loss,
+                "val_acc": acc,
+                "val_safe_incorrect": safe_incorrect/safe_total
+            })
 
         if val_loss < best_val_loss:
             print("        Saving best model...", flush=True)
@@ -301,3 +331,13 @@ for i in range(0, len(test_texts), batch_size):
 
 acc = correct/total
 print(f"Test Loss: {test_loss:.2f}, Accuracy: {acc * 100:.2f}%, Safe Incorrect: {safe_incorrect/safe_total * 100:.2f}%", flush=True)
+
+if wandb_log:
+    wandb.log({
+        "test_loss": test_loss,
+        "test_acc": acc,
+        "test_safe_incorrect": safe_incorrect/safe_total
+    })
+
+if wandb_log:
+    wandb.finish()
