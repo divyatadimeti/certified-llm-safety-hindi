@@ -3,6 +3,7 @@
 # 2. Huggingface tutorial on training transformers for sequence classification here: https://huggingface.co/docs/transformers/tasks/sequence_classification
 
 ### Importing libraries
+import wandb
 import argparse
 import warnings
 import numpy as np
@@ -37,6 +38,9 @@ parser.add_argument('--harmful_train', type=str, default='data/harmful_prompts_t
 parser.add_argument('--safe_test', type=str, default='data/safe_prompts_test_insertion_erased.txt', help='File containing safe prompts for testing')
 parser.add_argument('--harmful_test', type=str, default='data/harmful_prompts_test.txt', help='File containing harmful prompts for testing')
 parser.add_argument('--save_path', type=str, default='models/distilbert_insertion.pt', help='Path to save the model')
+parser.add_argument('--wandb_log', action='store_true', help='Flag for logging results to wandb')
+parser.add_argument('--wandb_project', type=str, default='llm-hindi-safety-filter', help='Name of the wandb project')
+parser.add_argument('--wandb_entity', type=str, default='patchtst-flashattention', help='Name of the wandb entity')
 
 args = parser.parse_args()
 
@@ -46,6 +50,7 @@ safe_prompt_train = read_text(args.safe_train)
 harm_prompt_train = read_text(args.harmful_train)
 prompt_data_train = pd.concat([safe_prompt_train, harm_prompt_train], ignore_index=True)
 prompt_data_train['Y'] = pd.Series(np.concatenate([np.ones(safe_prompt_train.shape[0]), np.zeros(harm_prompt_train.shape[0])])).astype(int)
+
 
 # Split train dataset into train and validation sets
 train_text, val_text, train_labels, val_labels = train_test_split(prompt_data_train[0], 
@@ -141,6 +146,15 @@ loss_fn = nn.CrossEntropyLoss()
 # number of training epochs
 epochs = 10
 
+wandb_log = args.wandb_log
+if wandb_log:
+    wandb.init(project=args.wandb_project, entity=args.wandb_entity)
+    wandb.config.update({
+        "epochs": epochs,
+        "batch_size": batch_size,
+        "learning_rate": 1e-5,
+    })
+
 # function to train the model
 def train():
 
@@ -196,6 +210,11 @@ def train():
   # reshape the predictions in form of (number of samples, no. of classes)
   total_preds  = np.concatenate(total_preds, axis=0)
 
+  if wandb_log:
+    wandb.log({
+      "train_loss": avg_loss
+    })
+
   #returns the loss and predictions
   return avg_loss, total_preds
 
@@ -250,6 +269,11 @@ def evaluate():
   # reshape the predictions in form of (number of samples, no. of classes)
   total_preds = np.concatenate(total_preds, axis=0)
 
+  if wandb_log:
+    wandb.log({
+      "val_loss": avg_loss
+    })
+
   return avg_loss, total_preds
 
 # set initial loss to infinite
@@ -285,6 +309,13 @@ if train_flag == True:
         
         print(f'\nTraining Loss: {training_loss:.3f}')
         print(f'Validation Loss: {validation_loss:.3f}')
+
+        if wandb_log:
+            wandb.log({
+                "epoch": epoch+1,
+                "train_loss": training_loss,
+                "val_loss": validation_loss
+            })
 
 
 # Test safety classifier
@@ -322,3 +353,8 @@ with torch.no_grad():
 preds = np.argmax(preds, axis = 1)
 print(f'Testing Accuracy = {100*torch.sum(torch.tensor(preds) == test_y)/test_y.shape[0]}%')
 print(classification_report(test_y, preds))
+
+if wandb_log:
+    wandb.log({
+        "test_acc": 100*torch.sum(torch.tensor(preds) == test_y)/test_y.shape[0]
+    })
