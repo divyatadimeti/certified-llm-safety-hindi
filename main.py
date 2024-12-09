@@ -302,8 +302,8 @@ if eval_type == "safe":
         
         if wandb_log:
             wandb.log({
-                f"percent_safe_prompt{i}": percent_safe,
-                f"time_per_prompt_prompt{i}": time_per_prompt
+                f"percent_safe_prompt_epoch": percent_safe,
+                f"time_per_prompt_prompt_epoch": time_per_prompt
             })
         
     # Compute standard error of the average time per prompt
@@ -383,8 +383,8 @@ elif eval_type == "empirical":
             
             if wandb_log:
                 wandb.log({
-                    f"percent_harmful_prompt{i}": percent_harmful,
-                    f"time_per_prompt_prompt{i}": time_per_prompt
+                    f"percent_harmful_prompt_epoch": percent_harmful,
+                    f"time_per_prompt_prompt_epoch": time_per_prompt
                 })
             
         # Compute standard error of the average time per prompt
@@ -452,8 +452,8 @@ elif eval_type == "grad_ec":
             
             if wandb_log:
                 wandb.log({
-                    f"percent_harmful_prompt{i}": percent_harmful,
-                    f"time_per_prompt_prompt{i}": time_per_prompt
+                    f"percent_harmful_prompt_epoch": percent_harmful,
+                    f"time_per_prompt_prompt_epoch": time_per_prompt
                 })
             
         print("")
@@ -529,8 +529,8 @@ elif eval_type == "greedy_ec":
             
             if wandb_log:
                 wandb.log({
-                    f"percent_harmful_prompt{i}": percent_harmful,
-                    f"time_per_prompt_prompt{i}": time_per_prompt
+                    f"percent_harmful_prompt_epoch": percent_harmful,
+                    f"time_per_prompt_prompt_epoch": time_per_prompt
                 })
             
         print("")
@@ -748,8 +748,8 @@ elif eval_type == "harmful":
         
         if wandb_log:
             wandb.log({
-                f"percent_harmful_prompt{i}": percent_harmful,
-                f"time_per_prompt_prompt{i}": time_per_prompt
+                f"percent_harmful_prompt_epoch": percent_harmful,
+                f"time_per_prompt_prompt_epoch": time_per_prompt
             })
         
     # Save results
