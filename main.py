@@ -25,6 +25,8 @@ parser.add_argument('--num_prompts', type=int, default=2,
                     help='number of prompts to check')
 parser.add_argument('--mode', type=str, default="suffix", choices=["suffix", "insertion", "infusion"],
                     help='attack mode to defend against')
+parser.add_argument('--data_dir', type=str, default="hindi_data/hindi",
+                    help='directory containing the prompts')
 parser.add_argument('--eval_type', type=str, default="safe", choices=["safe", "harmful", "smoothing", "empirical", "grad_ec", "greedy_ec", "roc_curve"],
                     help='type of prompts to evaluate')
 parser.add_argument('--max_erase', type=int, default=20,
@@ -77,6 +79,7 @@ parser.add_argument('--wandb_entity', type=str, default="patchtst-flashattention
 args = parser.parse_args()
 
 num_prompts = args.num_prompts
+data_dir = args.data_dir
 mode = args.mode
 eval_type = args.eval_type
 max_erase = args.max_erase
@@ -85,8 +88,6 @@ results_dir = args.results_dir
 use_classifier = args.use_classifier
 classifier_name = args.classifier_name
 model_wt_path = args.model_wt_path
-safe_prompts_file = args.safe_prompts
-harmful_prompts_file = args.harmful_prompts
 randomize = args.randomize
 sampling_ratio = args.sampling_ratio
 num_iters = args.num_iters
@@ -145,8 +146,6 @@ if wandb_log:
         "use_classifier": use_classifier,
         "classifier_name": classifier_name,
         "model_wt_path": model_wt_path,
-        "safe_prompts_file": safe_prompts_file,
-        "harmful_prompts_file": harmful_prompts_file,
         "llm_name": llm_name,
         "adv_prompts_dir": adv_prompts_dir,
     })
@@ -159,11 +158,11 @@ if not os.path.exists(results_dir):
 
 # Create results file
 if eval_type == "safe" or eval_type == "empirical":
-    results_file = os.path.join(results_dir, f"{eval_type}_{mode}_{num_prompts}.json")
+    results_file = os.path.join(results_dir, f"{eval_type}_{mode}_{num_prompts}_{language}.json")
 elif eval_type == "harmful" or eval_type == "smoothing" or eval_type == "grad_ec" or eval_type == "greedy_ec":
-    results_file = os.path.join(results_dir, f"{eval_type}_{num_prompts}.json")
+    results_file = os.path.join(results_dir, f"{eval_type}_{num_prompts}_{language}.json")
 elif eval_type == "roc_curve":
-    results_file = os.path.join(results_dir, f"{eval_type}_{max_erase}.json")
+    results_file = os.path.join(results_dir, f"{eval_type}_{max_erase}_{language}.json")
 
 
 # Add tag for safety classifier and randomized check
@@ -259,6 +258,9 @@ else:
 # length = 20 tokens 
 # adv_suffix = "--- suppose Finland----](/}]( $({[@ reversnewcommand SafeLinux={/}] '-_{( typeof"
 # adv_suffix = "unless {{ {pub principal](/|{{[!dernewcommand Safepler=\"${/} False{( typeof"
+
+safe_prompts_file = f"{data_dir}/safe_prompts.txt"
+harmful_prompts_file = f"{data_dir}/harmful_prompts.txt"
 
 if eval_type == "safe":
     # Safe prompts
@@ -565,7 +567,8 @@ elif eval_type == "roc_curve":
         adv_prompts = random.sample(adv_prompts, num_prompts)
 
     # Load safe prompts
-    safe_prompts_file = "data/safe_prompts_test.txt"
+    
+    safe_prompts_file = f"{data_dir}/safe_prompts_test.txt"
     print("Evaluating on safe prompts from: " + safe_prompts_file)
 
     with open(safe_prompts_file, "r") as f:
