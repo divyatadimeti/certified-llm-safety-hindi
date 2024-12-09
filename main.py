@@ -190,7 +190,7 @@ if use_classifier:
 
     # Load model weights
     # path = 'models/distillbert_saved_weights.pt'
-    if model_wt_path is not "":
+    if model_wt_path !="":
         model.load_state_dict(torch.load(model_wt_path))
     model.eval()
 
