@@ -61,6 +61,8 @@ parser.add_argument('--model_wt_path', type=str, default="",
                     help='path to the model weights of the trained safety filter')
 parser.add_argument('--llm_name', type=str, default="Llama-2", choices=["Llama-2", "Llama-2-13B", "Llama-3", "GPT-3.5"],
                     help='name of the LLM model (used only when use_classifier=False)')
+parser.add_argument('--max_seq_len', type=int, default=200,
+                    help='maximum sequence length for the LLM')
 
 # -- GradEC arguments -- #
 parser.add_argument('--num_iters', type=int, default=10,
@@ -88,6 +90,7 @@ results_dir = args.results_dir
 use_classifier = args.use_classifier
 classifier_name = args.classifier_name
 model_wt_path = args.model_wt_path
+max_seq_len = args.max_seq_len
 randomize = args.randomize
 sampling_ratio = args.sampling_ratio
 num_iters = args.num_iters
@@ -147,6 +150,7 @@ if wandb_log:
         "classifier_name": classifier_name,
         "model_wt_path": model_wt_path,
         "llm_name": llm_name,
+        "max_seq_len": max_seq_len,
         "adv_prompts_dir": adv_prompts_dir,
     })
 
@@ -730,7 +734,7 @@ elif eval_type == "harmful":
         batch = prompts[i:i+batch_size]
         # Evaluating the safety filter gives us certifed safety guarantees on
         # erase_and_check for harmful prompts (from construction).
-        harmful = is_harmful(batch, pipeline, tokenizer, llm_name=llm_name)
+        harmful = is_harmful(batch, pipeline, tokenizer, llm_name=llm_name, max_llm_sequence_len=max_seq_len)
         count_harmful += sum(harmful)
 
         current_time = time.time()
