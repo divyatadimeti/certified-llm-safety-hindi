@@ -8,7 +8,7 @@ import json
 import ast
 import random
 import argparse
-from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
+from transformers import DistilBertTokenizer, DistilBertForSequenceClassification, AutoTokenizer, AutoModelForSequenceClassification
 from math import ceil
 import numpy as np
 
@@ -53,6 +53,8 @@ parser.add_argument('--results_dir', type=str, default="results",
                     help='directory to save results')
 parser.add_argument('--use_classifier', action='store_true',
                     help='flag for using a custom trained safety filter')
+parser.add_argument('--classifier_name', type=str, default="distillbert", choices=["distillbert", "indicbert"],
+                    help='name of the classifier model')
 parser.add_argument('--model_wt_path', type=str, default="",
                     help='path to the model weights of the trained safety filter')
 parser.add_argument('--llm_name', type=str, default="Llama-2", choices=["Llama-2", "Llama-2-13B", "Llama-3", "GPT-3.5"],
@@ -81,6 +83,7 @@ max_erase = args.max_erase
 num_adv = args.num_adv
 results_dir = args.results_dir
 use_classifier = args.use_classifier
+classifier_name = args.classifier_name
 model_wt_path = args.model_wt_path
 safe_prompts_file = args.safe_prompts
 harmful_prompts_file = args.harmful_prompts
@@ -140,6 +143,7 @@ if wandb_log:
         "randomize": randomize,
         "sampling_ratio": sampling_ratio,
         "use_classifier": use_classifier,
+        "classifier_name": classifier_name,
         "model_wt_path": model_wt_path,
         "safe_prompts_file": safe_prompts_file,
         "harmful_prompts_file": harmful_prompts_file,
@@ -178,8 +182,12 @@ else:
 if use_classifier:
     # Using custom classifier for safety filter
     # Load model and tokenizer
-    tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
-    model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-uncased')
+    if classifier_name == "distillbert":
+        tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
+        model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-uncased')
+    elif classifier_name == "indicbert":
+        tokenizer = AutoTokenizer.from_pretrained('ai4bharat/indic-bert-base')
+        model = AutoModelForSequenceClassification.from_pretrained('ai4bharat/indic-bert-base')
 
     # Load model weights
     # path = 'models/distillbert_saved_weights.pt'
