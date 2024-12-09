@@ -284,7 +284,8 @@ Follow the instructions below to set up the environment for the experiments.
     ```
     conda install anaconda::seaborn
     ```
-9. Install `wandb`:
+9. Install additional dependencies for Hindi experiments:
     ```
     conda install -c conda-forge wandb
+    conda install -c conda-forge openai
     ```

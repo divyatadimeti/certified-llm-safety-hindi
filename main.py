@@ -158,11 +158,11 @@ if not os.path.exists(results_dir):
 
 # Create results file
 if eval_type == "safe" or eval_type == "empirical":
-    results_file = os.path.join(results_dir, f"{eval_type}_{mode}_{num_prompts}_{language}.json")
+    results_file = os.path.join(results_dir, f"{eval_type}_{mode}_{num_prompts}.json")
 elif eval_type == "harmful" or eval_type == "smoothing" or eval_type == "grad_ec" or eval_type == "greedy_ec":
-    results_file = os.path.join(results_dir, f"{eval_type}_{num_prompts}_{language}.json")
+    results_file = os.path.join(results_dir, f"{eval_type}_{num_prompts}.json")
 elif eval_type == "roc_curve":
-    results_file = os.path.join(results_dir, f"{eval_type}_{max_erase}_{language}.json")
+    results_file = os.path.join(results_dir, f"{eval_type}_{max_erase}.json")
 
 
 # Add tag for safety classifier and randomized check
@@ -190,7 +190,7 @@ if use_classifier:
 
     # Load model weights
     # path = 'models/distillbert_saved_weights.pt'
-    if model_wt_path !="":
+    if model_wt_path != "":
         model.load_state_dict(torch.load(model_wt_path))
     model.eval()
 
