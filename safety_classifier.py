@@ -147,8 +147,7 @@ loss_fn = nn.CrossEntropyLoss()
 # loss_fn = nn.NLLLoss()
 
 # number of training epochs
-epochs = 100
-patience = 3
+epochs = 10
 
 wandb_log = args.wandb_log
 if wandb_log:
@@ -157,7 +156,6 @@ if wandb_log:
         "epochs": epochs,
         "batch_size": batch_size,
         "learning_rate": 1e-5,
-        "patience": patience
     })
 
 # function to train the model
@@ -288,7 +286,6 @@ best_validation_loss = float('inf')
 training_losses=[]
 validation_losses=[]
 train_flag = True
-patience_counter = 0
 if train_flag == True:
     # for each epoch
     for epoch in range(epochs):
@@ -306,12 +303,6 @@ if train_flag == True:
         if validation_loss < best_validation_loss:
           best_validation_loss = validation_loss
           torch.save(model.state_dict(), args.save_path)
-        else:
-          patience_counter += 1
-
-        if patience_counter >= patience:
-          print(f"Early stopping at epoch {epoch+1}")
-          break
         
         # append training and validation loss
         training_losses.append(training_loss)
