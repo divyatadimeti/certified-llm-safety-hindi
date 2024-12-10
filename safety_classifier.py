@@ -304,14 +304,14 @@ if train_flag == True:
       
         #save the best model
         if validation_loss < best_validation_loss:
-            best_validation_loss = validation_loss
-            torch.save(model.state_dict(), args.save_path)
-            patience_counter = 0
+          best_validation_loss = validation_loss
+          torch.save(model.state_dict(), args.save_path)
         else:
-            patience_counter += 1
-            if patience_counter >= patience:
-                print(f"Early stopping at epoch {epoch+1}")
-                break
+          patience_counter += 1
+
+        if patience_counter >= patience:
+          print(f"Early stopping at epoch {epoch+1}")
+          break
         
         # append training and validation loss
         training_losses.append(training_loss)
