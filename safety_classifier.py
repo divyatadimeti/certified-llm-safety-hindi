@@ -69,9 +69,9 @@ count = train_labels.value_counts().to_dict()
 
 if args.classifier_name == "distilbert":
     # Load the tokenizer
-    tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-multilingual-cased')
+    tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
     # Load the model
-    model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-multilingual-cased')
+    model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-uncased')
 
 elif args.classifier_name == "indicbert":
     # Load the tokenizer
