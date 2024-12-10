@@ -189,8 +189,8 @@ if use_classifier:
         tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
         model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-uncased')
     elif classifier_name == "indicbert":
-        tokenizer = AutoTokenizer.from_pretrained('ai4bharat/indic-bert-base')
-        model = AutoModelForSequenceClassification.from_pretrained('ai4bharat/indic-bert-base')
+        tokenizer = AutoTokenizer.from_pretrained('indic-bert')
+        model = AutoModelForSequenceClassification.from_pretrained('indic-bert')
 
     # Load model weights
     # path = 'models/distillbert_saved_weights.pt'

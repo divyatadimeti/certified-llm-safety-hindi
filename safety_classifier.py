@@ -15,7 +15,7 @@ import torch.nn as nn
 from transformers import AdamW
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
-from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
+from transformers import DistilBertTokenizer, DistilBertForSequenceClassification, AutoTokenizer, AutoModelForSequenceClassification
 from torch.utils.data import TensorDataset, DataLoader, WeightedRandomSampler, SequentialSampler
 
 # specify the available devices
@@ -38,6 +38,7 @@ parser.add_argument('--harmful_train', type=str, default='data/harmful_prompts_t
 parser.add_argument('--safe_test', type=str, default='data/safe_prompts_test.txt', help='File containing safe prompts for testing')
 parser.add_argument('--harmful_test', type=str, default='data/harmful_prompts_test.txt', help='File containing harmful prompts for testing')
 parser.add_argument('--data_dir', type=str, default='data', help='Directory containing the data')
+parser.add_argument('--classifier_name', type=str, default='distilbert', help='Name of the classifier', choices=["distilbert", "indicbert"])
 parser.add_argument('--save_path', type=str, default='models/distilbert.pt', help='Path to save the model')
 parser.add_argument('--wandb_log', action='store_true', help='Flag for logging results to wandb')
 parser.add_argument('--wandb_project', type=str, default='llm-hindi-safety-filter', help='Name of the wandb project')
@@ -65,12 +66,17 @@ train_text, val_text, train_labels, val_labels = train_test_split(prompt_data_tr
 # Count number of samples in each class in the training set
 count = train_labels.value_counts().to_dict()
 
-# Load the tokenizer
-tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-multilingual-cased')
+if args.classifier_name == "distilbert":
+    # Load the tokenizer
+    tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-multilingual-cased')
+    # Load the model
+    model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-multilingual-cased')
 
-# pass the pre-trained DistilBert to our define architecture
-model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-multilingual-cased')
-# print(model)
+elif args.classifier_name == "indicbert":
+    # Load the tokenizer
+    tokenizer = AutoTokenizer.from_pretrained('indic-bert')
+    # Load the model
+    model = AutoModelForSequenceClassification.from_pretrained('indic-bert')
 
 # tokenize and encode sequences in the training set
 tokens_train = tokenizer.batch_encode_plus(
