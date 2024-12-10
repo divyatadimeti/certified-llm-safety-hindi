@@ -34,8 +34,6 @@ parser.add_argument('--max_erase', type=int, default=20,
                     help='maximum number of tokens to erase')
 parser.add_argument('--num_adv', type=int, default=2,
                     help='number of adversarial prompts to defend against (insertion mode only)')
-parser.add_argument('--safe_prompts', type=str, default="data/safe_prompts.txt")
-parser.add_argument('--harmful_prompts', type=str, default="data/harmful_prompts.txt")
 parser.add_argument('--attack', type=str, default="gcg", choices=["gcg", "autodan"],
                     help='attack to defend against')
 parser.add_argument('--adv_prompts_dir', type=str, default="data",
@@ -56,7 +54,7 @@ parser.add_argument('--results_dir', type=str, default="results",
                     help='directory to save results')
 parser.add_argument('--use_classifier', action='store_true',
                     help='flag for using a custom trained safety filter')
-parser.add_argument('--classifier_name', type=str, default="distillbert", choices=["distillbert", "indicbert"],
+parser.add_argument('--classifier_name', type=str, default="distilbert", choices=["distilbert", "indicbert"],
                     help='name of the classifier model')
 parser.add_argument('--model_wt_path', type=str, default="",
                     help='path to the model weights of the trained safety filter')
@@ -186,9 +184,9 @@ else:
 if use_classifier:
     # Using custom classifier for safety filter
     # Load model and tokenizer
-    if classifier_name == "distillbert":
-        tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
-        model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-uncased')
+    if classifier_name == "distilbert":
+        tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-multilingual-cased')
+        model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-multilingual-cased')
     elif classifier_name == "indicbert":
         tokenizer = transformers.AutoTokenizer.from_pretrained('ai4bharat/indic-bert', keep_accents=True)
         model = AutoModelForSequenceClassification.from_pretrained('ai4bharat/indic-bert')
