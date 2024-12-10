@@ -66,10 +66,10 @@ train_text, val_text, train_labels, val_labels = train_test_split(prompt_data_tr
 count = train_labels.value_counts().to_dict()
 
 # Load the tokenizer
-tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
+tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-multilingual-cased')
 
 # pass the pre-trained DistilBert to our define architecture
-model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-uncased')
+model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-multilingual-cased')
 # print(model)
 
 # tokenize and encode sequences in the training set
@@ -147,7 +147,8 @@ loss_fn = nn.CrossEntropyLoss()
 # loss_fn = nn.NLLLoss()
 
 # number of training epochs
-epochs = 10
+epochs = 100
+patience = 3
 
 wandb_log = args.wandb_log
 if wandb_log:
@@ -156,6 +157,7 @@ if wandb_log:
         "epochs": epochs,
         "batch_size": batch_size,
         "learning_rate": 1e-5,
+        "patience": patience
     })
 
 # function to train the model
@@ -286,7 +288,7 @@ best_validation_loss = float('inf')
 training_losses=[]
 validation_losses=[]
 train_flag = True
-
+patience_counter = 0
 if train_flag == True:
     # for each epoch
     for epoch in range(epochs):
@@ -304,7 +306,12 @@ if train_flag == True:
         if validation_loss < best_validation_loss:
             best_validation_loss = validation_loss
             torch.save(model.state_dict(), args.save_path)
-            # torch.save(model.state_dict(), 'new_distillbert_saved_weights.pt')
+            patience_counter = 0
+        else:
+            patience_counter += 1
+            if patience_counter >= patience:
+                print(f"Early stopping at epoch {epoch+1}")
+                break
         
         # append training and validation loss
         training_losses.append(training_loss)
