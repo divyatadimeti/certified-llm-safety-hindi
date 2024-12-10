@@ -37,6 +37,7 @@ parser.add_argument('--safe_train', type=str, default='data/safe_prompts_train.t
 parser.add_argument('--harmful_train', type=str, default='data/harmful_prompts_train.txt', help='File containing harmful prompts for training')
 parser.add_argument('--safe_test', type=str, default='data/safe_prompts_test.txt', help='File containing safe prompts for testing')
 parser.add_argument('--harmful_test', type=str, default='data/harmful_prompts_test.txt', help='File containing harmful prompts for testing')
+parser.add_argument('--data_dir', type=str, default='data', help='Directory containing the data')
 parser.add_argument('--save_path', type=str, default='models/distilbert.pt', help='Path to save the model')
 parser.add_argument('--wandb_log', action='store_true', help='Flag for logging results to wandb')
 parser.add_argument('--wandb_project', type=str, default='llm-hindi-safety-filter', help='Name of the wandb project')
@@ -46,8 +47,10 @@ args = parser.parse_args()
 
 # Load safe and harmful prompts and create the dataset for training classifier
 # Class 1: Safe, Class 0: Harmful
-safe_prompt_train = read_text(args.safe_train)
-harm_prompt_train = read_text(args.harmful_train)
+safe_train = f"{args.data_dir}/safe_prompts_train.txt"
+safe_prompt_train = read_text(safe_train)
+harm_train = f"{args.data_dir}/harmful_prompts_train.txt"
+harm_prompt_train = read_text(harm_train)
 prompt_data_train = pd.concat([safe_prompt_train, harm_prompt_train], ignore_index=True)
 prompt_data_train['Y'] = pd.Series(np.concatenate([np.ones(safe_prompt_train.shape[0]), np.zeros(harm_prompt_train.shape[0])])).astype(int)
 
@@ -319,8 +322,10 @@ if train_flag == True:
 
 
 # Test safety classifier
-safe_prompt_test = read_text(args.safe_test)
-harm_prompt_test = read_text(args.harmful_test)
+safe_test = f"{args.data_dir}/safe_prompts_test.txt"
+safe_prompt_test = read_text(safe_test)
+harm_test = f"{args.data_dir}/harmful_prompts_test.txt"
+harm_prompt_test = read_text(harm_test)
 prompt_data_test = pd.concat([safe_prompt_test, harm_prompt_test], ignore_index=True)
 prompt_data_test['Y'] = pd.Series(np.concatenate([np.ones(safe_prompt_test.shape[0]), np.zeros(harm_prompt_test.shape[0])])).astype(int)
 
