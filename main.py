@@ -1,3 +1,4 @@
+import pdb
 import torch
 import wandb
 import transformers
@@ -184,17 +185,24 @@ else:
 if use_classifier:
     # Using custom classifier for safety filter
     # Load model and tokenizer
+    pdb.set_trace()
     if classifier_name == "distilbert":
         tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-multilingual-cased')
         model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-multilingual-cased')
+       
     elif classifier_name == "indicbert":
         tokenizer = transformers.AutoTokenizer.from_pretrained('ai4bharat/indic-bert', keep_accents=True)
         model = AutoModelForSequenceClassification.from_pretrained('ai4bharat/indic-bert')
 
     # Load model weights
     # path = 'models/distillbert_saved_weights.pt'
+
+    # Debugging - print the keys of the state_dict
+    state_dict = torch.load(model_wt_path)
+    print([key for key in state_dict.keys() if 'classifier' in key])
+
     if model_wt_path != "":
-        model.load_state_dict(torch.load(model_wt_path))
+        model.load_state_dict(torch.load(model_wt_path, strict=True))
     model.eval()
 
     # Create a text classification pipeline
