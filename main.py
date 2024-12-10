@@ -8,7 +8,8 @@ import json
 import ast
 import random
 import argparse
-from transformers import DistilBertTokenizer, DistilBertForSequenceClassification, AutoTokenizer, AutoModel
+import transformers
+from transformers import DistilBertTokenizer, DistilBertForSequenceClassification, AutoTokenizer, AutoModelForSequenceClassification
 from math import ceil
 import numpy as np
 
@@ -189,8 +190,8 @@ if use_classifier:
         tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
         model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-uncased')
     elif classifier_name == "indicbert":
-        tokenizer = AutoTokenizer.from_pretrained('ai4bharat/indic-bert')
-        model = AutoModel.from_pretrained('ai4bharat/indic-bert')
+        tokenizer = transformers.AutoTokenizer.from_pretrained('ai4bharat/indic-bert', keep_accents=True)
+        model = AutoModelForSequenceClassification.from_pretrained('ai4bharat/indic-bert')
 
     # Load model weights
     # path = 'models/distillbert_saved_weights.pt'
