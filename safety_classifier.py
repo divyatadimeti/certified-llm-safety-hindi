@@ -33,11 +33,11 @@ seed = 912
 
 ## Parser for setting input values
 parser = argparse.ArgumentParser(description='Adversarial masks for the safety classifier.')
-parser.add_argument('--safe_train', type=str, default='data/safe_prompts_train_insertion_erased.txt', help='File containing safe prompts for training')
+parser.add_argument('--safe_train', type=str, default='data/safe_prompts_train.txt', help='File containing safe prompts for training')
 parser.add_argument('--harmful_train', type=str, default='data/harmful_prompts_train.txt', help='File containing harmful prompts for training')
-parser.add_argument('--safe_test', type=str, default='data/safe_prompts_test_insertion_erased.txt', help='File containing safe prompts for testing')
+parser.add_argument('--safe_test', type=str, default='data/safe_prompts_test.txt', help='File containing safe prompts for testing')
 parser.add_argument('--harmful_test', type=str, default='data/harmful_prompts_test.txt', help='File containing harmful prompts for testing')
-parser.add_argument('--save_path', type=str, default='models/distilbert_insertion.pt', help='Path to save the model')
+parser.add_argument('--save_path', type=str, default='models/distilbert.pt', help='Path to save the model')
 parser.add_argument('--wandb_log', action='store_true', help='Flag for logging results to wandb')
 parser.add_argument('--wandb_project', type=str, default='llm-hindi-safety-filter', help='Name of the wandb project')
 parser.add_argument('--wandb_entity', type=str, default='patchtst-flashattention', help='Name of the wandb entity')
