@@ -1,6 +1,5 @@
 # Python file to implement certified defenses against adversarial prompts
 # in large language models.
-
 import random
 import itertools
 import numpy as np

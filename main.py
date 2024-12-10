@@ -1,4 +1,3 @@
-import pdb
 import torch
 import wandb
 import transformers
@@ -27,7 +26,7 @@ parser.add_argument('--num_prompts', type=int, default=2,
                     help='number of prompts to check')
 parser.add_argument('--mode', type=str, default="suffix", choices=["suffix", "insertion", "infusion"],
                     help='attack mode to defend against')
-parser.add_argument('--data_dir', type=str, default="hindi_data/hindi",
+parser.add_argument('--data_dir', type=str, default="data",
                     help='directory containing the prompts')
 parser.add_argument('--eval_type', type=str, default="safe", choices=["safe", "harmful", "smoothing", "empirical", "grad_ec", "greedy_ec", "roc_curve"],
                     help='type of prompts to evaluate')
@@ -185,7 +184,6 @@ else:
 if use_classifier:
     # Using custom classifier for safety filter
     # Load model and tokenizer
-    pdb.set_trace()
     if classifier_name == "distilbert":
         tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-multilingual-cased')
         model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-multilingual-cased')
@@ -194,15 +192,8 @@ if use_classifier:
         tokenizer = transformers.AutoTokenizer.from_pretrained('ai4bharat/indic-bert', keep_accents=True)
         model = AutoModelForSequenceClassification.from_pretrained('ai4bharat/indic-bert')
 
-    # Load model weights
-    # path = 'models/distillbert_saved_weights.pt'
-
-    # Debugging - print the keys of the state_dict
-    state_dict = torch.load(model_wt_path)
-    print([key for key in state_dict.keys() if 'classifier' in key])
-
     if model_wt_path != "":
-        model.load_state_dict(torch.load(model_wt_path, strict=True))
+        model.load_state_dict(torch.load(model_wt_path), strict=True)
     model.eval()
 
     # Create a text classification pipeline
