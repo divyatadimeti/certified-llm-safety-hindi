@@ -742,9 +742,9 @@ elif eval_type == "harmful":
     print("\nEvaluating harmful prompts from: " + harmful_prompts_file + "\n")
     # Load prompts from text file
     with open(harmful_prompts_file, "r") as f:
-        prompts = f.readlines()
+        file_prompts = f.readlines()
         prompts = []
-        for p in prompts:
+        for p in file_prompts:
             prompt = p.strip()
             if mode != "base":
                 if mode == "prefix":
