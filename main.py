@@ -761,12 +761,6 @@ elif eval_type == "harmful":
 
 print("")
 
-results["percent_all"] = (percent_harmful + percent_safe) / 2
-if wandb_log:
-    wandb.log({
-        "percent_all": results["percent_all"]
-    })
-
 # Save results
 print("Saving results to " + results_file)
 with open(results_file, "w") as f:
