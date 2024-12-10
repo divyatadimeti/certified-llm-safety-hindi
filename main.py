@@ -24,7 +24,7 @@ from openai import OpenAI
 parser = argparse.ArgumentParser(description='Check safety of prompts.')
 parser.add_argument('--num_prompts', type=int, default=2,
                     help='number of prompts to check')
-parser.add_argument('--mode', type=str, default="suffix", choices=["suffix", "insertion", "infusion"],
+parser.add_argument('--mode', type=str, default="base", choices=["base", "suffix", "insertion", "prefix"],
                     help='attack mode to defend against')
 parser.add_argument('--data_dir', type=str, default="data",
                     help='directory containing the prompts')
@@ -263,6 +263,8 @@ else:
 
 safe_prompts_file = f"{data_dir}/safe_prompts.txt"
 harmful_prompts_file = f"{data_dir}/harmful_prompts.txt"
+prefsuffix_file = f"{data_dir}/prefsuffix.txt"
+insertion_file = f"{data_dir}/insertion.txt"
 
 if eval_type == "safe":
     # Safe prompts
@@ -705,24 +707,47 @@ elif eval_type == "smoothing":
         })
 
 elif eval_type == "harmful":
+    # Check the mode
+    print(f"Evaluating with mode: {mode}")
+    if mode == "prefix":
+        phrases_file = prefsuffix_file
+    elif mode == "suffix":
+        phrases_file = prefsuffix_file
+    elif mode == "insertion":
+        phrases_file = insertion_file
+    else:
+        raise ValueError("Invalid mode: " + mode)
+    
+    # Load phrases from text file
+    with open(phrases_file, "r") as f:
+        phrases = f.readlines()
+        phrases = [phrase.strip() for phrase in phrases]
+
     # Harmful prompts
     print("\nEvaluating harmful prompts from: " + harmful_prompts_file + "\n")
     # Load prompts from text file
     with open(harmful_prompts_file, "r") as f:
         prompts = f.readlines()
-        prompts = [prompt.strip() for prompt in prompts]
+        prompts = []
+        for p in prompts:
+            prompt = p.strip()
+            if mode == "prefix":
+                phrase = np.random.choice(phrases)
+                prompt = phrase + prompt
+            elif mode == "suffix":
+                phrase = np.random.choice(phrases)
+                prompt = prompt + phrase
+            elif mode == "insertion":
+                phrase = np.random.choice(phrases)
+                insert_idx = np.random.randint(0, len(prompt))
+                prompt = prompt[:insert_idx] + phrase + prompt[insert_idx:]
+            prompts.append(prompt)
 
     # Sample a random subset of the prompts
     if num_prompts <= len(prompts):
         prompts = random.sample(prompts, num_prompts)
     else:
         prompts = random.choices(prompts, k=num_prompts)
-
-    # Optionally append adversarial suffix
-    # if args.append_adv:
-    #     prompts_adv = []
-    #     for p in prompts: prompts_adv.append(p + adv_suffix)
-    #     prompts = prompts_adv 
 
     # Check if the prompts are harmful
     count_harmful = 0

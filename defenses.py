@@ -256,7 +256,10 @@ def is_harmful(prompts, pipeline, tokenizer, no_sys_prompt=False, min_length=5, 
 
 
 def erase_and_check(prompt, pipeline, tokenizer, max_erase=20, num_adv=2, randomized=False, prompt_sampling_ratio=0.1, mode="suffix", llm_name='Llama-2', max_llm_sequence_len=200):
-    if mode == "suffix":
+    if mode == "prefix":
+        return erase_and_check_suffix(prompt, pipeline, tokenizer, max_erase=max_erase,
+                                      randomized=randomized, prompt_sampling_ratio=prompt_sampling_ratio, llm_name=llm_name, max_llm_sequence_len=max_llm_sequence_len, reverse=True)
+    elif mode == "suffix":
         return erase_and_check_suffix(prompt, pipeline, tokenizer, max_erase=max_erase,
                                       randomized=randomized, prompt_sampling_ratio=prompt_sampling_ratio, llm_name=llm_name, max_llm_sequence_len=max_llm_sequence_len)
     elif mode == "infusion":
@@ -269,7 +272,7 @@ def erase_and_check(prompt, pipeline, tokenizer, max_erase=20, num_adv=2, random
         raise ValueError("Invalid mode: " + mode)
 
 
-def erase_and_check_suffix(prompt, pipeline, tokenizer, max_erase=20, randomized=False, prompt_sampling_ratio=0.1, llm_name='Llama-2', max_llm_sequence_len=200):   
+def erase_and_check_suffix(prompt, pipeline, tokenizer, max_erase=20, randomized=False, prompt_sampling_ratio=0.1, llm_name='Llama-2', max_llm_sequence_len=200, reverse=False):   
     """
     Erase the prompt one token at a time from the end and check if any of the generated substrings is harmful.
     Args:
@@ -278,6 +281,7 @@ def erase_and_check_suffix(prompt, pipeline, tokenizer, max_erase=20, randomized
         tokenizer: The tokenizer to use to tokenize the prompt.
         max_erase: The maximum number of tokens to erase from the end of the prompt.
         min_length: The minimum length of each erased prompt. Any prompt shorter than this will be regarded as not harmful.
+        reverse: Whether to erase from the start or the end of the prompt.
     Returns:
         True if any of the erased strings is harmful, False otherwise.
     """
@@ -291,7 +295,10 @@ def erase_and_check_suffix(prompt, pipeline, tokenizer, max_erase=20, randomized
     prompt_list = [prompt]
     #for i in range(min(max_erase, prompt_length - min_length)):
     for i in range(min(max_erase, prompt_length)):
-        erased_prompt_tokens = prompt_tokens[:-(i+1)]
+        if reverse:
+            erased_prompt_tokens = prompt_tokens[:-(i+1)]
+        else:
+            erased_prompt_tokens = prompt_tokens[i+1:]
         erased_prompt = tokenizer.decode(erased_prompt_tokens)
         prompt_list.append(erased_prompt)
 
