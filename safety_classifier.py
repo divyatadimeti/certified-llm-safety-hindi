@@ -12,6 +12,7 @@ warnings.filterwarnings("ignore")
 
 import torch
 import torch.nn as nn
+import transformers
 from transformers import AdamW
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
@@ -74,7 +75,7 @@ if args.classifier_name == "distilbert":
 
 elif args.classifier_name == "indicbert":
     # Load the tokenizer
-    tokenizer = AutoTokenizer.from_pretrained('ai4bharat/indic-bert')
+    tokenizer = transformers.AutoTokenizer.from_pretrained('ai4bharat/indic-bert', keep_accents=True)
     # Load the model
     model = AutoModel.from_pretrained('ai4bharat/indic-bert')
 
