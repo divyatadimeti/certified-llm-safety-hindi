@@ -791,6 +791,8 @@ elif eval_type == "harmful":
                 f"time_per_prompt_prompt_epoch": time_per_prompt
             })
         
+    percent_harmful = count_harmful / num_prompts * 100
+
     # Save results
     results["percent_harmful"] = percent_harmful
 
