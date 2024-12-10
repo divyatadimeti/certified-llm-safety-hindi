@@ -15,7 +15,7 @@ import torch.nn as nn
 from transformers import AdamW
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
-from transformers import DistilBertTokenizer, DistilBertForSequenceClassification, AutoTokenizer, AutoModelForSequenceClassification
+from transformers import DistilBertTokenizer, DistilBertForSequenceClassification, AutoTokenizer, AutoModel
 from torch.utils.data import TensorDataset, DataLoader, WeightedRandomSampler, SequentialSampler
 
 # specify the available devices
@@ -76,7 +76,7 @@ elif args.classifier_name == "indicbert":
     # Load the tokenizer
     tokenizer = AutoTokenizer.from_pretrained('ai4bharat/indic-bert')
     # Load the model
-    model = AutoModelForSequenceClassification.from_pretrained('ai4bharat/indic-bert')
+    model = AutoModel.from_pretrained('ai4bharat/indic-bert')
 
 # tokenize and encode sequences in the training set
 tokens_train = tokenizer.batch_encode_plus(
