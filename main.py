@@ -22,7 +22,7 @@ from greedy_grad_ec import greedy_grad_ec
 from openai import OpenAI
 
 parser = argparse.ArgumentParser(description='Check safety of prompts.')
-parser.add_argument('--num_prompts', type=int, default=2,
+parser.add_argument('--num_prompts', type=int, default=-1,
                     help='number of prompts to check')
 parser.add_argument('--mode', type=str, default="base", choices=["base", "suffix", "insertion", "prefix"],
                     help='attack mode to defend against')
@@ -275,8 +275,11 @@ if eval_type == "safe":
         prompts = [prompt.strip() for prompt in prompts]
 
     # Sample a random subset of the prompts
-    prompts = random.sample(prompts, num_prompts)
-
+    if num_prompts > 0:
+        prompts = random.sample(prompts, num_prompts)
+    else:
+        num_prompts = len(prompts)
+    
     # Check if the prompts are harmful
     count_safe = 0
     start_time = time.time()
@@ -346,12 +349,11 @@ elif eval_type == "empirical":
             if attack == "autodan":
                 prompts = [ast.literal_eval(prompt) for prompt in prompts]
 
-        # for prompt in prompts[:5]:
-        #     print(prompt)
-        # exit()
-
         # Sample a random subset of the prompts
-        prompts = random.sample(prompts, num_prompts)
+        if num_prompts > 0:
+            prompts = random.sample(prompts, num_prompts)
+        else:
+            num_prompts = len(prompts)
 
         # Check if the prompts are harmful
         count_harmful = 0
@@ -425,7 +427,10 @@ elif eval_type == "grad_ec":
             prompts = [prompt.strip() for prompt in prompts]
 
         # Sample a random subset of the prompts
-        prompts = random.sample(prompts, num_prompts)
+        if num_prompts > 0:
+            prompts = random.sample(prompts, num_prompts)
+        else:
+            num_prompts = len(prompts)
 
         # Check if the prompts are harmful
         count_harmful = 0
@@ -503,7 +508,10 @@ elif eval_type == "greedy_ec":
                 prompts = [ast.literal_eval(prompt) for prompt in prompts]
 
         # Sample a random subset of the prompts
-        prompts = random.sample(prompts, num_prompts)
+        if num_prompts > 0:
+            prompts = random.sample(prompts, num_prompts)
+        else:
+            num_prompts = len(prompts)
 
         # Check if the prompts are harmful
         count_harmful = 0
@@ -567,11 +575,12 @@ elif eval_type == "roc_curve":
         adv_prompts = [prompt.strip() for prompt in adv_prompts]
     
     # Sample a random subset of the prompts
-    if num_prompts <= len(adv_prompts):
+    if num_prompts > 0:
         adv_prompts = random.sample(adv_prompts, num_prompts)
+    else:
+        num_prompts = len(adv_prompts)
 
     # Load safe prompts
-    
     safe_prompts_file = f"{data_dir}/safe_prompts_test.txt"
     print("Evaluating on safe prompts from: " + safe_prompts_file)
 
@@ -580,8 +589,10 @@ elif eval_type == "roc_curve":
         safe_prompts = [prompt.strip() for prompt in safe_prompts]
 
     # Sample a random subset of the prompts
-    if num_prompts <= len(safe_prompts):
+    if num_prompts > 0:
         safe_prompts = random.sample(safe_prompts, num_prompts)
+    else:
+        num_prompts = len(safe_prompts)
 
     print(f"\nEvaluating {ec_variant}...")
     roc = {
@@ -679,7 +690,10 @@ elif eval_type == "smoothing":
         prompts = [prompt.strip() for prompt in prompts]
 
     # Sample a random subset of the prompts
-    prompts = random.sample(prompts, num_prompts)
+    if num_prompts > 0:
+        prompts = random.sample(prompts, num_prompts)
+    else:
+        num_prompts = len(prompts)
 
     # List of certified lengths
     certified_length = [0] * num_prompts
@@ -708,20 +722,21 @@ elif eval_type == "smoothing":
 
 elif eval_type == "harmful":
     # Check the mode
-    print(f"Evaluating with mode: {mode}")
-    if mode == "prefix":
-        phrases_file = prefsuffix_file
-    elif mode == "suffix":
-        phrases_file = prefsuffix_file
-    elif mode == "insertion":
-        phrases_file = insertion_file
-    else:
-        raise ValueError("Invalid mode: " + mode)
-    
-    # Load phrases from text file
-    with open(phrases_file, "r") as f:
-        phrases = f.readlines()
-        phrases = [phrase.strip() for phrase in phrases]
+    if mode != "base":
+        print(f"Evaluating with mode: {mode}")
+        if mode == "prefix":
+            phrases_file = prefsuffix_file
+        elif mode == "suffix":
+            phrases_file = prefsuffix_file
+        elif mode == "insertion":
+            phrases_file = insertion_file
+        else:
+            raise ValueError("Invalid mode: " + mode)
+        
+        # Load phrases from text file
+        with open(phrases_file, "r") as f:
+            phrases = f.readlines()
+            phrases = [phrase.strip() for phrase in phrases]
 
     # Harmful prompts
     print("\nEvaluating harmful prompts from: " + harmful_prompts_file + "\n")
@@ -731,23 +746,24 @@ elif eval_type == "harmful":
         prompts = []
         for p in prompts:
             prompt = p.strip()
-            if mode == "prefix":
-                phrase = np.random.choice(phrases)
-                prompt = phrase + prompt
-            elif mode == "suffix":
-                phrase = np.random.choice(phrases)
-                prompt = prompt + phrase
-            elif mode == "insertion":
-                phrase = np.random.choice(phrases)
-                insert_idx = np.random.randint(0, len(prompt))
-                prompt = prompt[:insert_idx] + phrase + prompt[insert_idx:]
+            if mode != "base":
+                if mode == "prefix":
+                    phrase = np.random.choice(phrases)
+                    prompt = phrase + prompt
+                elif mode == "suffix":
+                    phrase = np.random.choice(phrases)
+                    prompt = prompt + phrase
+                elif mode == "insertion":
+                    phrase = np.random.choice(phrases)
+                    insert_idx = np.random.randint(0, len(prompt))
+                    prompt = prompt[:insert_idx] + phrase + prompt[insert_idx:]
             prompts.append(prompt)
 
     # Sample a random subset of the prompts
-    if num_prompts <= len(prompts):
+    if num_prompts > 0:
         prompts = random.sample(prompts, num_prompts)
     else:
-        prompts = random.choices(prompts, k=num_prompts)
+        num_prompts = len(prompts)
 
     # Check if the prompts are harmful
     count_harmful = 0
