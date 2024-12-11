@@ -681,12 +681,43 @@ elif eval_type == "roc_curve":
         wandb.log(roc)
 
 elif eval_type == "smoothing":
-    # Smoothing-based certificates on harmful prompts
-    print("Evaluating smoothing-based certificates on harmful prompts from: " + harmful_prompts_file)
+    # Check the mode
+    if mode != "base":
+        print(f"Evaluating with mode: {mode}")
+        if mode == "prefix":
+            phrases_file = prefsuffix_file
+        elif mode == "suffix":
+            phrases_file = prefsuffix_file
+        elif mode == "insertion":
+            phrases_file = insertion_file
+        else:
+            raise ValueError("Invalid mode: " + mode)
+        
+        # Load phrases from text file
+        with open(phrases_file, "r") as f:
+            phrases = f.readlines()
+            phrases = [phrase.strip() for phrase in phrases]
+
+    # Harmful prompts
+    print("\nEvaluating harmful prompts from: " + harmful_prompts_file + "\n")
     # Load prompts from text file
     with open(harmful_prompts_file, "r") as f:
-        prompts = f.readlines()
-        prompts = [prompt.strip() for prompt in prompts]
+        file_prompts = f.readlines()
+        prompts = []
+        for p in file_prompts:
+            prompt = p.strip()
+            if mode != "base":
+                if mode == "prefix":
+                    phrase = np.random.choice(phrases)
+                    prompt = phrase + prompt
+                elif mode == "suffix":
+                    phrase = np.random.choice(phrases)
+                    prompt = prompt + phrase
+                elif mode == "insertion":
+                    phrase = np.random.choice(phrases)
+                    insert_idx = np.random.randint(0, len(prompt))
+                    prompt = prompt[:insert_idx] + phrase + prompt[insert_idx:]
+            prompts.append(prompt)
 
     # Sample a random subset of the prompts
     if num_prompts > 0:
