@@ -396,16 +396,16 @@ if eval_type == "ec_all_data":
             })
         
     # Compute standard error of the average time per prompt
-    time_per_prompt_se = torch.tensor(time_list).std().item() / (len(safe_prompts) ** 0.5)
+    # time_per_prompt_se = torch.tensor(time_list).std().item() / (len(safe_prompts) ** 0.5)
 
-    # Compute standard error of the percentage of harmful prompts
-    percent_safe_se = (percent_safe * (100 - percent_safe) / (len(safe_prompts) - 1)) ** 0.5
+    # # Compute standard error of the percentage of harmful prompts
+    # percent_safe_se = (percent_safe * (100 - percent_safe) / (len(safe_prompts) - 1)) ** 0.5
 
-    if wandb_log:
-        wandb.log({
-            "percent_safe_standard_error": percent_safe_se,
-            "time_per_prompt_standard_error_safe": time_per_prompt_se
-        })
+    # if wandb_log:
+    #     wandb.log({
+    #         "percent_safe_standard_error": percent_safe_se,
+    #         "time_per_prompt_standard_error_safe": time_per_prompt_se
+    #     })
 
     # Combine harmful and safe results
     y_true = y_true_harmful + y_true_safe
