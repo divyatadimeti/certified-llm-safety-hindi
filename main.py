@@ -175,11 +175,11 @@ elif eval_type == "roc_curve":
 #     results_file = results_file.replace(".json", f"_rand.json")
 
 # Load results if they exist
-if os.path.exists(results_file):
-    with open(results_file, "r") as f:
-        results = json.load(f)
-else:
-    results = {}
+# if os.path.exists(results_file):
+#     with open(results_file, "r") as f:
+#         results = json.load(f)
+# else:
+#     results = {}
 
 if use_classifier:
     # Using custom classifier for safety filter
