@@ -947,7 +947,7 @@ elif eval_type == "harmful":
     percent_harmful = count_harmful / num_prompts * 100
 
     # Save results
-    results["percent_harmful"] = percent_harmful
+    # results["percent_harmful"] = percent_harmful
 
     if wandb_log:
         wandb.log({
@@ -957,9 +957,9 @@ elif eval_type == "harmful":
 print("")
 
 # Save results
-print("Saving results to " + results_file)
-with open(results_file, "w") as f:
-    json.dump(results, f, indent=2)
+# print("Saving results to " + results_file)
+# with open(results_file, "w") as f:
+#     json.dump(results, f, indent=2)
 
 if wandb_log:
     wandb.finish()
