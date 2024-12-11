@@ -380,6 +380,7 @@ if eval_type == "ec_all_data":
         
         y_pred_safe.append(0 if safe else 1)
         if safe:
+            print("MARKED SAFE")
             count_safe += 1
 
         current_time = time.time()
