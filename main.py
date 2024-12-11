@@ -260,8 +260,8 @@ else:
 # adv_suffix = "--- suppose Finland----](/}]( $({[@ reversnewcommand SafeLinux={/}] '-_{( typeof"
 # adv_suffix = "unless {{ {pub principal](/|{{[!dernewcommand Safepler=\"${/} False{( typeof"
 
-safe_prompts_file = f"{data_dir}/safe_prompts.txt"
-harmful_prompts_file = f"{data_dir}/harmful_prompts.txt"
+safe_prompts_file = f"{data_dir}/safe_prompts_test.txt"
+harmful_prompts_file = f"{data_dir}/harmful_prompts_test.txt"
 prefsuffix_file = f"{data_dir}/prefsuffix.txt"
 insertion_file = f"{data_dir}/insertion.txt"
 
