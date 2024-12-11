@@ -315,7 +315,7 @@ if eval_type == "ec_all_data":
         safe_prompts = []
         for p in file_prompts:
             prompt = p.strip()
-        safe_prompts.append(prompt)
+            safe_prompts.append(prompt)
 
     # Check if the prompts are harmful
     count_harmful = 0
