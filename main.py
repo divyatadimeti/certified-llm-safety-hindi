@@ -711,13 +711,13 @@ elif eval_type == "smoothing":
 
     for i in range(num_lengths):
         certified_accuracy[i] = sum([length >= i for length in certified_length]) / num_prompts * 100
+        if wandb_log:
+            wandb.log({
+                "num_lengths": i,
+                "certified_accuracy": certified_accuracy[i]
+            })
 
     results[str(dict(max_erase = max_erase))] = dict(certified_accuracy = certified_accuracy)
-
-    if wandb_log:
-        wandb.log({
-            "certified_accuracy": certified_accuracy
-        })
 
 elif eval_type == "harmful":
     # Check the mode
