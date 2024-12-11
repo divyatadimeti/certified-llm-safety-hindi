@@ -759,8 +759,21 @@ elif eval_type == "smoothing":
     # List of certified lengths
     certified_length = [0] * num_prompts
 
+    start_time = time.time()
+    time_list = []
+    elapsed_time = 0
     for i in range(num_prompts):
         certified_length[i] = erase_and_check_smoothing(prompts[i], pipeline, tokenizer, max_erase=max_erase)
+
+        current_time = time.time()
+        time_list.append(current_time - start_time - elapsed_time)
+        elapsed_time = current_time - start_time
+        time_per_prompt = elapsed_time / (i + 1)
+
+        if wandb_log:
+            wandb.log({
+                f"time_per_prompt_prompt_epoch": time_per_prompt
+            })
 
         # Print progress
         print("    Evaluating certificates... " + progress_bar((i + 1) / num_prompts), end="\r", flush=True)

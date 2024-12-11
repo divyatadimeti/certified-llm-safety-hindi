@@ -289,4 +289,5 @@ Follow the instructions below to set up the environment for the experiments.
     conda install -c conda-forge wandb
     conda install -c conda-forge openai
     conda install -c conda-forge tiktoken
+    conda install -c conda-forge sentencepiece
     ```
