@@ -159,7 +159,7 @@ if not os.path.exists(results_dir):
     os.makedirs(results_dir)
 
 # Create results file
-if eval_type == "safe" or eval_type == "empirical":
+if eval_type == "ec_harmful" or eval_type == "empirical":
     results_file = os.path.join(results_dir, f"{eval_type}_{mode}_{num_prompts}.json")
 elif eval_type == "harmful" or eval_type == "smoothing" or eval_type == "grad_ec" or eval_type == "greedy_ec":
     results_file = os.path.join(results_dir, f"{eval_type}_{num_prompts}.json")
