@@ -169,10 +169,10 @@ elif eval_type == "roc_curve":
 
 
 # Add tag for safety classifier and randomized check
-if use_classifier:
-    results_file = results_file.replace(".json", "_clf.json")
-if randomize:
-    results_file = results_file.replace(".json", f"_rand.json")
+# if use_classifier:
+#     results_file = results_file.replace(".json", "_clf.json")
+# if randomize:
+#     results_file = results_file.replace(".json", f"_rand.json")
 
 # Load results if they exist
 if os.path.exists(results_file):
