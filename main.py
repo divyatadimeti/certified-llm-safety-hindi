@@ -372,6 +372,7 @@ if eval_type == "ec_all_data":
     time_list = []
     elapsed_time = 0
     for i in range(len(safe_prompts)):
+        print("ENTERED SAFE PROMPTS LOOP")
         prompt = safe_prompts[i]
         # if args.append_adv: prompt += adv_suffix
         safe = erase_and_check(prompt, pipeline, tokenizer, max_erase=max_erase, num_adv=num_adv, randomized=randomize,
