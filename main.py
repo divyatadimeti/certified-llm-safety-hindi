@@ -28,7 +28,7 @@ parser.add_argument('--mode', type=str, default="base", choices=["base", "suffix
                     help='attack mode to defend against')
 parser.add_argument('--data_dir', type=str, default="data",
                     help='directory containing the prompts')
-parser.add_argument('--eval_type', type=str, default="safe", choices=["safe", "harmful", "smoothing", "empirical", "grad_ec", "greedy_ec", "roc_curve", "ec_harmful"],
+parser.add_argument('--eval_type', type=str, default="ec_harmful", choices=["harmful", "smoothing", "empirical", "grad_ec", "greedy_ec", "roc_curve", "ec_harmful"],
                     help='type of prompts to evaluate')
 parser.add_argument('--max_erase', type=int, default=20,
                     help='maximum number of tokens to erase')
@@ -516,60 +516,76 @@ elif eval_type == "greedy_ec":
         print("Option --use_classifier must be turned on. GreedyEC only works with a trained safety classifier.")
         exit()
 
-    emp_results = {}
+    # Check the mode
+    if mode != "base":
+        print(f"Evaluating with mode: {mode}")
+        if mode == "prefix":
+            phrases_file = prefsuffix_file
+        elif mode == "suffix":
+            phrases_file = prefsuffix_file
+        elif mode == "insertion":
+            phrases_file = insertion_file
+        else:
+            raise ValueError("Invalid mode: " + mode)
+        
+        # Load phrases from text file
+        with open(phrases_file, "r") as f:
+            phrases = f.readlines()
+            phrases = [phrase.strip() for phrase in phrases]
 
-    if attack == "autodan":
-        range_limit = 1
+    # Harmful prompts
+    print("\nEvaluating harmful prompts from: " + harmful_prompts_file + "\n")
+    # Load prompts from text file
+    with open(harmful_prompts_file, "r") as f:
+        file_prompts = f.readlines()
+        prompts = []
+        for p in file_prompts:
+            prompt = p.strip()
+            if mode != "base":
+                if mode == "prefix":
+                    phrase = np.random.choice(phrases)
+                    prompt = phrase + prompt
+                elif mode == "suffix":
+                    phrase = np.random.choice(phrases)
+                    prompt = prompt + phrase
+                elif mode == "insertion":
+                    phrase = np.random.choice(phrases)
+                    insert_idx = np.random.randint(0, len(prompt))
+                    prompt = prompt[:insert_idx] + phrase + prompt[insert_idx:]
+            prompts.append(prompt)
+
+    # Sample a random subset of the prompts
+    if num_prompts > 0:
+        prompts = random.sample(prompts, num_prompts)
     else:
-        range_limit = 21
+        num_prompts = len(prompts)
 
-    for adv_tok in range(0, range_limit, 2):
-        if attack == "autodan":
-            adv_prompts_file = "data/AutoDAN_prompts.txt"
-        else:
-            adv_prompts_file = "data/adversarial_prompts_t_" + str(adv_tok) + ".txt"
+    # Check if the prompts are harmful
+    count_harmful = 0
+    start_time = time.time()
+    time_list = []
+    elapsed_time = 0
+    for i in range(num_prompts):
+        prompt = prompts[i]
+        harmful = greedy_ec(prompt, model, tokenizer, num_iters=num_iters)
+        
+        if harmful:
+            count_harmful += 1
 
-        print("Evaluating on adversarial prompts from: " + adv_prompts_file)
-        # Load prompts from text file
-        with open(adv_prompts_file, "r") as f:
-            prompts = f.readlines()
-            prompts = [prompt.strip() for prompt in prompts]
-            if attack == "autodan":
-                prompts = [ast.literal_eval(prompt) for prompt in prompts]
-
-        # Sample a random subset of the prompts
-        if num_prompts > 0:
-            prompts = random.sample(prompts, num_prompts)
-        else:
-            num_prompts = len(prompts)
-
-        # Check if the prompts are harmful
-        count_harmful = 0
-        start_time = time.time()
-        time_list = []
-        elapsed_time = 0
-        for i in range(num_prompts):
-            prompt = prompts[i]
-            harmful = greedy_ec(prompt, model, tokenizer, num_iters=num_iters)
-            
-            # harmful = is_harmful(prompt, model, tokenizer, num_iters=num_iters, init_temp=float(num_iters/100), reg_const=1e-3)
-            if harmful:
-                count_harmful += 1
-
-            current_time = time.time()
-            time_list.append(current_time - start_time - elapsed_time)
-            elapsed_time = current_time - start_time
-            time_per_prompt = elapsed_time / (i + 1)
-            percent_harmful = count_harmful / (i + 1) * 100
-            print("    Checking safety... " + progress_bar((i + 1) / num_prompts) \
-                + f' Detected harmful = {percent_harmful:5.1f}%' \
-                + f' Time/prompt = {time_per_prompt:5.1f}s', end="\r", flush=True)
-            
-            if wandb_log:
-                wandb.log({
-                    f"percent_harmful_prompt_epoch": percent_harmful,
-                    f"time_per_prompt_prompt_epoch": time_per_prompt
-                })
+        current_time = time.time()
+        time_list.append(current_time - start_time - elapsed_time)
+        elapsed_time = current_time - start_time
+        time_per_prompt = elapsed_time / (i + 1)
+        percent_harmful = count_harmful / (i + 1) * 100
+        print("    Checking safety... " + progress_bar((i + 1) / num_prompts) \
+            + f' Detected harmful = {percent_harmful:5.1f}%' \
+            + f' Time/prompt = {time_per_prompt:5.1f}s', end="\r", flush=True)
+        
+        if wandb_log:
+            wandb.log({
+                f"percent_harmful_prompt_epoch": percent_harmful,
+                f"time_per_prompt_prompt_epoch": time_per_prompt
+            })
             
         print("")
 
@@ -584,11 +600,6 @@ elif eval_type == "greedy_ec":
                 "percent_harmful_standard_error": percent_harmful_se,
                 "time_per_prompt_standard_error": time_per_prompt_se
             })
-
-        # Save results
-        emp_results[str(dict(adv_tok = adv_tok))] = dict(percent_harmful = percent_harmful, time_per_prompt = time_per_prompt, percent_harmful_se = percent_harmful_se, time_per_prompt_se = time_per_prompt_se)
-
-    results[str(dict(num_iters = num_iters))] = emp_results
 
 elif eval_type == "roc_curve":
     # ROC curve
