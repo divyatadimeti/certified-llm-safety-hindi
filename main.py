@@ -29,7 +29,7 @@ parser.add_argument('--mode', type=str, default="base", choices=["base", "suffix
                     help='attack mode to defend against')
 parser.add_argument('--data_dir', type=str, default="data",
                     help='directory containing the prompts')
-parser.add_argument('--eval_type', type=str, default="ec_harmful", choices=["harmful", "smoothing", "empirical", "grad_ec", "greedy_ec", "roc_curve", "ec_harmful"],
+parser.add_argument('--eval_type', type=str, default="ec_all_data", choices=["harmful", "smoothing", "empirical", "grad_ec", "greedy_ec", "roc_curve", "ec_all_data"],
                     help='type of prompts to evaluate')
 parser.add_argument('--max_erase', type=int, default=20,
                     help='maximum number of tokens to erase')
