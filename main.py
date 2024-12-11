@@ -12,6 +12,7 @@ import transformers
 from transformers import DistilBertTokenizer, DistilBertForSequenceClassification, AutoTokenizer, AutoModelForSequenceClassification
 from math import ceil
 import numpy as np
+from sklearn.metrics import f1_score, precision_score, recall_score
 
 from defenses import is_harmful
 from defenses import progress_bar, erase_and_check, erase_and_check_smoothing
@@ -269,7 +270,7 @@ else:
     prefsuffix_file = f"{data_dir}/prefsuffix.txt"
     insertion_file = f"{data_dir}/insertion.txt"
 
-if eval_type == "ec_harmful":
+if eval_type == "ec_all_data":
     # Check the mode
     if mode != "base":
         print(f"Evaluating with mode: {mode}")
@@ -292,7 +293,7 @@ if eval_type == "ec_harmful":
     # Load prompts from text file
     with open(harmful_prompts_file, "r") as f:
         file_prompts = f.readlines()
-        prompts = []
+        harmful_prompts = []
         for p in file_prompts:
             prompt = p.strip()
             if mode != "base":
@@ -306,25 +307,32 @@ if eval_type == "ec_harmful":
                     phrase = np.random.choice(phrases)
                     insert_idx = np.random.randint(0, len(prompt))
                     prompt = prompt[:insert_idx] + phrase + prompt[insert_idx:]
-            prompts.append(prompt)
+            harmful_prompts.append(prompt)
 
-    # Sample a random subset of the prompts
-    if num_prompts > 0:
-        prompts = random.sample(prompts, num_prompts)
-    else:
-        num_prompts = len(prompts)
+
+    with open(safe_prompts_file, "r") as f:
+        file_prompts = f.readlines()
+        safe_prompts = []
+        for p in file_prompts:
+            prompt = p.strip()
+        safe_prompts.append(prompt)
 
     # Check if the prompts are harmful
     count_harmful = 0
+    y_true_harmful = [1] * len(harmful_prompts)
+    y_pred_harmful = []
     start_time = time.time()
     time_list = []
     elapsed_time = 0
-    for i in range(num_prompts):
-        prompt = prompts[i]
+    for i in range(len(harmful_prompts)):
+        prompt = harmful_prompts[i]
         # if args.append_adv: prompt += adv_suffix
         harmful = erase_and_check(prompt, pipeline, tokenizer, max_erase=max_erase, num_adv=num_adv, randomized=randomize,
                                   prompt_sampling_ratio=sampling_ratio, mode=mode, llm_name=llm_name)
         
+
+        y_pred_harmful.append(1 if harmful else 0)
+
         if harmful:
             count_harmful += 1
 
@@ -333,7 +341,7 @@ if eval_type == "ec_harmful":
         elapsed_time = current_time - start_time
         time_per_prompt = elapsed_time / (i + 1)
         percent_harmful = count_harmful / (i + 1) * 100
-        print("    Checking harmfulness... " + progress_bar((i + 1) / num_prompts) \
+        print("    Checking harmfulness... " + progress_bar((i + 1) / len(harmful_prompts)) \
             + f' Detected harmful = {percent_harmful:5.1f}%' \
             + f' Time/prompt = {time_per_prompt:5.1f}s', end="\r", flush=True)
         
@@ -344,23 +352,79 @@ if eval_type == "ec_harmful":
             })
         
     # Compute standard error of the average time per prompt
-    time_per_prompt_se = torch.tensor(time_list).std().item() / (num_prompts ** 0.5)
+    time_per_prompt_se = torch.tensor(time_list).std().item() / (len(harmful_prompts) ** 0.5)
 
     # Compute standard error of the percentage of harmful prompts
-    percent_harmful_se = (percent_harmful* (100 - percent_harmful) / (num_prompts - 1)) ** 0.5
+    percent_harmful_se = (percent_harmful * (100 - percent_harmful) / (len(harmful_prompts) - 1)) ** 0.5
 
-    # Save results
-    if mode == "insertion":
-        if str(dict(num_adv = num_adv)) not in results:
-            results[str(dict(num_adv = num_adv))] = {}
-        results[str(dict(num_adv = num_adv))][str(dict(max_erase = max_erase))] = dict(percent_harmful = percent_harmful, time_per_prompt = time_per_prompt, percent_harmful_se = percent_harmful_se, time_per_prompt_se = time_per_prompt_se)
-    else:
-        results[str(dict(max_erase = max_erase))] = dict(percent_harmful = percent_harmful, time_per_prompt = time_per_prompt, percent_harmful_se = percent_harmful_se, time_per_prompt_se = time_per_prompt_se)
-    
     if wandb_log:
         wandb.log({
             "percent_harmful_standard_error": percent_harmful_se,
-            "time_per_prompt_standard_error": time_per_prompt_se
+            "time_per_prompt_standard_error_harmful": time_per_prompt_se
+        })
+
+    # Check if the prompts are safe
+    count_safe = 0
+    y_true_safe = [0] * len(safe_prompts)
+    y_pred_safe = []
+    start_time = time.time()
+    time_list = []
+    elapsed_time = 0
+    for i in range(len(safe_prompts)):
+        prompt = safe_prompts[i]
+        # if args.append_adv: prompt += adv_suffix
+        safe = erase_and_check(prompt, pipeline, tokenizer, max_erase=max_erase, num_adv=num_adv, randomized=randomize,
+                                  prompt_sampling_ratio=sampling_ratio, mode=mode, llm_name=llm_name)
+        
+        y_pred_safe.append(0 if safe else 1)
+        if safe:
+            count_safe += 1
+
+        current_time = time.time()
+        time_list.append(current_time - start_time - elapsed_time)
+        elapsed_time = current_time - start_time
+        time_per_prompt = elapsed_time / (i + 1)
+        percent_safe = count_safe / (i + 1) * 100
+        print("    Checking safety... " + progress_bar((i + 1) / len(safe_prompts)) \
+            + f' Detected safe = {percent_safe:5.1f}%' \
+            + f' Time/prompt = {time_per_prompt:5.1f}s', end="\r", flush=True)
+        
+        if wandb_log:
+            wandb.log({
+                f"percent_safe_prompt_epoch": percent_harmful,
+                f"time_per_prompt_prompt_epoch": time_per_prompt
+            })
+        
+    # Compute standard error of the average time per prompt
+    time_per_prompt_se = torch.tensor(time_list).std().item() / (len(safe_prompts) ** 0.5)
+
+    # Compute standard error of the percentage of harmful prompts
+    percent_safe_se = (percent_safe * (100 - percent_safe) / (len(safe_prompts) - 1)) ** 0.5
+
+    if wandb_log:
+        wandb.log({
+            "percent_safe_standard_error": percent_safe_se,
+            "time_per_prompt_standard_error_safe": time_per_prompt_se
+        })
+
+    # Combine harmful and safe results
+    y_true = y_true_harmful + y_true_safe
+    y_pred = y_pred_harmful + y_pred_safe
+
+    # Calculate metrics
+    f1 = f1_score(y_true, y_pred)
+    precision = precision_score(y_true, y_pred)
+    recall = recall_score(y_true, y_pred)
+
+    print(f"\nF1 Score: {f1:.4f}")
+    print(f"Precision: {precision:.4f}")
+    print(f"Recall: {recall:.4f}")
+
+    if wandb_log:
+        wandb.log({
+            "f1_score": f1,
+            "precision": precision,
+            "recall": recall
         })
 
 elif eval_type == "empirical":
