@@ -265,22 +265,53 @@ harmful_prompts_file = f"{data_dir}/harmful_prompts.txt"
 prefsuffix_file = f"{data_dir}/prefsuffix.txt"
 insertion_file = f"{data_dir}/insertion.txt"
 
-if eval_type == "safe":
-    # Safe prompts
-    print("\nEvaluating safe prompts from: " + safe_prompts_file + "\n")
+if eval_type == "ec_harmful":
+    # Check the mode
+    if mode != "base":
+        print(f"Evaluating with mode: {mode}")
+        if mode == "prefix":
+            phrases_file = prefsuffix_file
+        elif mode == "suffix":
+            phrases_file = prefsuffix_file
+        elif mode == "insertion":
+            phrases_file = insertion_file
+        else:
+            raise ValueError("Invalid mode: " + mode)
+        
+        # Load phrases from text file
+        with open(phrases_file, "r") as f:
+            phrases = f.readlines()
+            phrases = [phrase.strip() for phrase in phrases]
+
+    # Harmful prompts
+    print("\nEvaluating harmful prompts from: " + harmful_prompts_file + "\n")
     # Load prompts from text file
-    with open(safe_prompts_file, "r") as f:
-        prompts = f.readlines()
-        prompts = [prompt.strip() for prompt in prompts]
+    with open(harmful_prompts_file, "r") as f:
+        file_prompts = f.readlines()
+        prompts = []
+        for p in file_prompts:
+            prompt = p.strip()
+            if mode != "base":
+                if mode == "prefix":
+                    phrase = np.random.choice(phrases)
+                    prompt = phrase + prompt
+                elif mode == "suffix":
+                    phrase = np.random.choice(phrases)
+                    prompt = prompt + phrase
+                elif mode == "insertion":
+                    phrase = np.random.choice(phrases)
+                    insert_idx = np.random.randint(0, len(prompt))
+                    prompt = prompt[:insert_idx] + phrase + prompt[insert_idx:]
+            prompts.append(prompt)
 
     # Sample a random subset of the prompts
     if num_prompts > 0:
         prompts = random.sample(prompts, num_prompts)
     else:
         num_prompts = len(prompts)
-    
+
     # Check if the prompts are harmful
-    count_safe = 0
+    count_harmful = 0
     start_time = time.time()
     time_list = []
     elapsed_time = 0
@@ -290,41 +321,41 @@ if eval_type == "safe":
         harmful = erase_and_check(prompt, pipeline, tokenizer, max_erase=max_erase, num_adv=num_adv, randomized=randomize,
                                   prompt_sampling_ratio=sampling_ratio, mode=mode, llm_name=llm_name)
         
-        if not harmful:
-            count_safe += 1
+        if harmful:
+            count_harmful += 1
 
         current_time = time.time()
         time_list.append(current_time - start_time - elapsed_time)
         elapsed_time = current_time - start_time
         time_per_prompt = elapsed_time / (i + 1)
-        percent_safe = count_safe / (i + 1) * 100
-        print("    Checking safety... " + progress_bar((i + 1) / num_prompts) \
-            + f' Detected safe = {percent_safe:5.1f}%' \
+        percent_harmful = count_harmful / (i + 1) * 100
+        print("    Checking harmfulness... " + progress_bar((i + 1) / num_prompts) \
+            + f' Detected harmful = {percent_harmful:5.1f}%' \
             + f' Time/prompt = {time_per_prompt:5.1f}s', end="\r", flush=True)
         
         if wandb_log:
             wandb.log({
-                f"percent_safe_prompt_epoch": percent_safe,
+                f"percent_harmful_prompt_epoch": percent_harmful,
                 f"time_per_prompt_prompt_epoch": time_per_prompt
             })
         
     # Compute standard error of the average time per prompt
     time_per_prompt_se = torch.tensor(time_list).std().item() / (num_prompts ** 0.5)
 
-    # Compute standard error of the percentage of safe prompts
-    percent_safe_se = (percent_safe * (100 - percent_safe) / (num_prompts - 1)) ** 0.5
+    # Compute standard error of the percentage of harmful prompts
+    percent_harmful_se = (percent_harmful* (100 - percent_harmful) / (num_prompts - 1)) ** 0.5
 
     # Save results
     if mode == "insertion":
         if str(dict(num_adv = num_adv)) not in results:
             results[str(dict(num_adv = num_adv))] = {}
-        results[str(dict(num_adv = num_adv))][str(dict(max_erase = max_erase))] = dict(percent_safe = percent_safe, time_per_prompt = time_per_prompt, percent_safe_se = percent_safe_se, time_per_prompt_se = time_per_prompt_se)
+        results[str(dict(num_adv = num_adv))][str(dict(max_erase = max_erase))] = dict(percent_harmful = percent_harmful, time_per_prompt = time_per_prompt, percent_harmful_se = percent_harmful_se, time_per_prompt_se = time_per_prompt_se)
     else:
-        results[str(dict(max_erase = max_erase))] = dict(percent_safe = percent_safe, time_per_prompt = time_per_prompt, percent_safe_se = percent_safe_se, time_per_prompt_se = time_per_prompt_se)
+        results[str(dict(max_erase = max_erase))] = dict(percent_harmful = percent_harmful, time_per_prompt = time_per_prompt, percent_harmful_se = percent_harmful_se, time_per_prompt_se = time_per_prompt_se)
     
     if wandb_log:
         wandb.log({
-            "percent_safe_standard_error": percent_safe_se,
+            "percent_harmful_standard_error": percent_harmful_se,
             "time_per_prompt_standard_error": time_per_prompt_se
         })
 
