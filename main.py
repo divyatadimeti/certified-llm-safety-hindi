@@ -105,7 +105,7 @@ print("\n* * * * * * Experiment Details * * * * * *")
 if torch.cuda.is_available():
     print("Device: " + torch.cuda.get_device_name(0))
 print("Evaluation type: " + eval_type)
-print("Number of prompts to check: " + str(num_prompts))
+print("Number of prompts to check: " + str(num_prompts if num_prompts > 0 else "all"))
 # print("Append adversarial prompts? " + str(args.append_adv))
 print("Use randomization? " + str(randomize))
 if randomize:
@@ -135,7 +135,6 @@ print("* * * * * * * * * * ** * * * * * * * * * *\n", flush=True)
 if wandb_log:
     wandb.init(project=wandb_project, entity=wandb_entity)
     wandb.config.update({
-        "num_prompts": num_prompts,
         "mode": mode,
         "eval_type": eval_type,
         "max_erase": max_erase,
