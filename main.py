@@ -575,7 +575,7 @@ elif eval_type == "greedy_ec":
     # Harmful prompts
     print("\nEvaluating harmful prompts from: " + harmful_prompts_file + "\n")
     # Load prompts from text file
-    prompts = get_harmful_prompts(hidden_harmful)
+    prompts = get_harmful_prompts()
 
     # Sample a random subset of the prompts
     if num_prompts > 0:
