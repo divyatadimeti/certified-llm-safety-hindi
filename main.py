@@ -269,6 +269,15 @@ def get_phrases():
 if mode != "base":
     phrases = get_phrases()
 
+def get_safe_prompts():
+    with open(safe_prompts_file, "r") as f:
+        file_prompts = f.readlines()
+        safe_prompts = []
+        for p in file_prompts:
+            prompt = p.strip()
+            safe_prompts.append(prompt)
+    return safe_prompts
+
 def get_harmful_prompts():
     # Load prompts from text file
     with open(harmful_prompts_file, "r") as f:
@@ -288,21 +297,13 @@ def get_harmful_prompts():
                     insert_idx = np.random.randint(0, len(prompt))
                     prompt = prompt[:insert_idx] + phrase + prompt[insert_idx:]
             if hidden_harmful:
-                sel_safe_prompts = random.sample(safe_prompts_file, 2)
+                safe_prompts = get_safe_prompts()
+                sel_safe_prompts = random.sample(safe_prompts, 2)
                 padded_prompt = sel_safe_prompts[0] + prompt + sel_safe_prompts[1]
                 harmful_prompts.append(padded_prompt)
             else:
                 harmful_prompts.append(prompt)
     return harmful_prompts
-
-def get_safe_prompts():
-    with open(safe_prompts_file, "r") as f:
-        file_prompts = f.readlines()
-        safe_prompts = []
-        for p in file_prompts:
-            prompt = p.strip()
-            safe_prompts.append(prompt)
-    return safe_prompts
 
 if eval_type == "ec_all_data":
     # Check the mode
@@ -328,7 +329,7 @@ if eval_type == "ec_all_data":
 
     # Safe prompts
     print("\nEvaluating safe prompts from: " + safe_prompts_file + "\n")
-    safe_prompts = get_safe_prompts(safe_prompts_file)
+    safe_prompts = get_safe_prompts()
 
     # Check if the prompts are harmful
     count_harmful = 0
@@ -385,7 +386,6 @@ if eval_type == "ec_all_data":
     elapsed_time = 0
     print(len(safe_prompts))
     for i in range(len(safe_prompts)):
-        print("ENTERED SAFE PROMPTS LOOP")
         prompt = safe_prompts[i]
         # if args.append_adv: prompt += adv_suffix
         safe = erase_and_check(prompt, pipeline, tokenizer, max_erase=max_erase, num_adv=num_adv, randomized=randomize,
@@ -393,7 +393,6 @@ if eval_type == "ec_all_data":
         
         y_pred_safe.append(0 if safe else 1)
         if safe:
-            print("MARKED SAFE")
             count_safe += 1
 
         current_time = time.time()
