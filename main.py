@@ -27,6 +27,7 @@ parser.add_argument('--num_prompts', type=int, default=-1,
                     help='number of prompts to check')
 parser.add_argument('--mode', type=str, default="base", choices=["base", "suffix", "insertion", "prefix"],
                     help='attack mode to defend against')
+parser.add_argument("--hidden_harmful", action="store_true", help="use hidden harmful prompts within safe prompts")
 parser.add_argument('--data_dir', type=str, default="data",
                     help='directory containing the prompts')
 parser.add_argument('--eval_type', type=str, default="ec_all_data", choices=["harmful", "smoothing", "empirical", "grad_ec", "greedy_ec", "roc_curve", "ec_all_data"],
@@ -81,6 +82,7 @@ parser.add_argument('--wandb_entity', type=str, default="patchtst-flashattention
 args = parser.parse_args()
 
 num_prompts = args.num_prompts
+hidden_harmful = args.hidden_harmful
 data_dir = args.data_dir
 mode = args.mode
 eval_type = args.eval_type
@@ -151,11 +153,9 @@ if wandb_log:
         "llm_name": llm_name,
         "max_seq_len": max_seq_len,
         "adv_prompts_dir": adv_prompts_dir,
+        "hidden_harmful": hidden_harmful
     })
 
-# Create results directory if it doesn't exist
-# if use_classifier:
-#     results_dir = results_dir + "_clf"
 if not os.path.exists(results_dir):
     os.makedirs(results_dir)
 
@@ -166,20 +166,6 @@ elif eval_type == "harmful" or eval_type == "smoothing" or eval_type == "grad_ec
     results_file = os.path.join(results_dir, f"{eval_type}_{num_prompts}.json")
 elif eval_type == "roc_curve":
     results_file = os.path.join(results_dir, f"{eval_type}_{max_erase}.json")
-
-
-# Add tag for safety classifier and randomized check
-# if use_classifier:
-#     results_file = results_file.replace(".json", "_clf.json")
-# if randomize:
-#     results_file = results_file.replace(".json", f"_rand.json")
-
-# Load results if they exist
-# if os.path.exists(results_file):
-#     with open(results_file, "r") as f:
-#         results = json.load(f)
-# else:
-#     results = {}
 
 if use_classifier:
     # Using custom classifier for safety filter
@@ -204,8 +190,6 @@ else:
     if llm_name == "Llama-2":
         # Load model and tokenizer
         model = "meta-llama/Llama-2-7b-chat-hf"
-        # commit_id = "main"        # to use the latest version
-        # commit_id = "08751db2aca9bf2f7f80d2e516117a53d7450235"      # to reproduce the results in our paper
 
         print(f'Loading model {model}...')
         tokenizer = AutoTokenizer.from_pretrained(model)
@@ -255,12 +239,6 @@ else:
 
         # tokenizer = AutoTokenizer.from_pretrained("gpt2")
 
-
-# Suffix to fool LLama safety filter from Zou et al's code
-# length = 20 tokens 
-# adv_suffix = "--- suppose Finland----](/}]( $({[@ reversnewcommand SafeLinux={/}] '-_{( typeof"
-# adv_suffix = "unless {{ {pub principal](/|{{[!dernewcommand Safepler=\"${/} False{( typeof"
-
 if mode == "base":
     safe_prompts_file = f"{data_dir}/safe_prompts_test.txt"
     harmful_prompts_file = f"{data_dir}/harmful_prompts_test.txt"
@@ -269,6 +247,62 @@ else:
     harmful_prompts_file = f"{data_dir}/harmful_prompts.txt"
     prefsuffix_file = f"{data_dir}/prefsuffix.txt"
     insertion_file = f"{data_dir}/insertion.txt"
+
+def get_phrases():
+    # Check the mode
+    print(f"Evaluating with mode: {mode}")
+    if mode == "prefix":
+        phrases_file = prefsuffix_file
+    elif mode == "suffix":
+        phrases_file = prefsuffix_file
+    elif mode == "insertion":
+        phrases_file = insertion_file
+    else:
+        raise ValueError("Invalid mode: " + mode)
+    
+    # Load phrases from text file
+    with open(phrases_file, "r") as f:
+        phrases = f.readlines()
+        phrases = [phrase.strip() for phrase in phrases]
+    return phrases
+
+if mode != "base":
+    phrases = get_phrases()
+
+def get_harmful_prompts():
+    # Load prompts from text file
+    with open(harmful_prompts_file, "r") as f:
+        file_prompts = f.readlines()
+        harmful_prompts = []
+        for p in file_prompts:
+            prompt = p.strip()
+            if mode != "base":
+                if mode == "prefix":
+                    phrase = np.random.choice(phrases)
+                    prompt = phrase + prompt
+                elif mode == "suffix":
+                    phrase = np.random.choice(phrases)
+                    prompt = prompt + phrase
+                elif mode == "insertion":
+                    phrase = np.random.choice(phrases)
+                    insert_idx = np.random.randint(0, len(prompt))
+                    prompt = prompt[:insert_idx] + phrase + prompt[insert_idx:]
+            if hidden_harmful:
+                sel_safe_prompts = random.sample(safe_prompts_file, 2)
+                padded_prompt = sel_safe_prompts[0] + prompt + sel_safe_prompts[1]
+                harmful_prompts.append(padded_prompt)
+            else:
+                harmful_prompts.append(prompt)
+    return harmful_prompts
+
+def get_safe_prompts():
+    with open(safe_prompts_file, "r") as f:
+        file_prompts = f.readlines()
+        safe_prompts = []
+        for p in file_prompts:
+            prompt = p.strip()
+            safe_prompts.append(prompt)
+    return safe_prompts
 
 if eval_type == "ec_all_data":
     # Check the mode
@@ -290,32 +324,11 @@ if eval_type == "ec_all_data":
 
     # Harmful prompts
     print("\nEvaluating harmful prompts from: " + harmful_prompts_file + "\n")
-    # Load prompts from text file
-    with open(harmful_prompts_file, "r") as f:
-        file_prompts = f.readlines()
-        harmful_prompts = []
-        for p in file_prompts:
-            prompt = p.strip()
-            if mode != "base":
-                if mode == "prefix":
-                    phrase = np.random.choice(phrases)
-                    prompt = phrase + prompt
-                elif mode == "suffix":
-                    phrase = np.random.choice(phrases)
-                    prompt = prompt + phrase
-                elif mode == "insertion":
-                    phrase = np.random.choice(phrases)
-                    insert_idx = np.random.randint(0, len(prompt))
-                    prompt = prompt[:insert_idx] + phrase + prompt[insert_idx:]
-            harmful_prompts.append(prompt)
+    harmful_prompts = get_harmful_prompts()
 
-
-    with open(safe_prompts_file, "r") as f:
-        file_prompts = f.readlines()
-        safe_prompts = []
-        for p in file_prompts:
-            prompt = p.strip()
-            safe_prompts.append(prompt)
+    # Safe prompts
+    print("\nEvaluating safe prompts from: " + safe_prompts_file + "\n")
+    safe_prompts = get_safe_prompts(safe_prompts_file)
 
     # Check if the prompts are harmful
     count_harmful = 0
@@ -397,18 +410,6 @@ if eval_type == "ec_all_data":
                 f"percent_safe_prompt_epoch": percent_harmful,
                 f"time_per_prompt_prompt_epoch": time_per_prompt
             })
-        
-    # Compute standard error of the average time per prompt
-    # time_per_prompt_se = torch.tensor(time_list).std().item() / (len(safe_prompts) ** 0.5)
-
-    # # Compute standard error of the percentage of harmful prompts
-    # percent_safe_se = (percent_safe * (100 - percent_safe) / (len(safe_prompts) - 1)) ** 0.5
-
-    # if wandb_log:
-    #     wandb.log({
-    #         "percent_safe_standard_error": percent_safe_se,
-    #         "time_per_prompt_standard_error_safe": time_per_prompt_se
-    #     })
 
     # Combine harmful and safe results
     y_true = y_true_harmful + y_true_safe
@@ -432,7 +433,6 @@ if eval_type == "ec_all_data":
 
 elif eval_type == "empirical":
     # Empirical performance on adversarial prompts
-    emp_results = {}
     if attack == "autodan":
         range_limit = 1
     else:
@@ -503,14 +503,6 @@ elif eval_type == "empirical":
             })
 
         print("")
-            
-        # Save results
-        emp_results[str(dict(adv_tok = adv_tok))] = dict(percent_harmful = percent_harmful, time_per_prompt = time_per_prompt, percent_harmful_se = percent_harmful_se, time_per_prompt_se = time_per_prompt_se)
-
-    if randomize:
-        results[str(dict(sampling_ratio = sampling_ratio))] = emp_results
-    else:
-        results[str(dict(max_erase = max_erase))] = emp_results
 
 elif eval_type == "grad_ec":
     # Evaluating the performance of GradEC on adversarial prompts
@@ -518,7 +510,6 @@ elif eval_type == "grad_ec":
         print("Option --use_classifier must be turned on. GradEC only works with a trained safety classifier.")
         exit()
 
-    emp_results = {}
     for adv_tok in range(0, 21, 2):
         adv_prompts_file = "data/adversarial_prompts_t_" + str(adv_tok) + ".txt"
         print("Evaluating on adversarial prompts from: " + adv_prompts_file)
@@ -576,54 +567,16 @@ elif eval_type == "grad_ec":
                 "time_per_prompt_standard_error": time_per_prompt_se
             })
 
-        # Save results
-        emp_results[str(dict(adv_tok = adv_tok))] = dict(percent_harmful = percent_harmful, time_per_prompt = time_per_prompt, percent_harmful_se = percent_harmful_se, time_per_prompt_se = time_per_prompt_se)
-
-    results[str(dict(num_iters = num_iters))] = emp_results
-
 elif eval_type == "greedy_ec":
     # Evaluating the performance of GreedyEC on adversarial prompts
     if not use_classifier:
         print("Option --use_classifier must be turned on. GreedyEC only works with a trained safety classifier.")
         exit()
 
-    # Check the mode
-    if mode != "base":
-        print(f"Evaluating with mode: {mode}")
-        if mode == "prefix":
-            phrases_file = prefsuffix_file
-        elif mode == "suffix":
-            phrases_file = prefsuffix_file
-        elif mode == "insertion":
-            phrases_file = insertion_file
-        else:
-            raise ValueError("Invalid mode: " + mode)
-        
-        # Load phrases from text file
-        with open(phrases_file, "r") as f:
-            phrases = f.readlines()
-            phrases = [phrase.strip() for phrase in phrases]
-
     # Harmful prompts
     print("\nEvaluating harmful prompts from: " + harmful_prompts_file + "\n")
     # Load prompts from text file
-    with open(harmful_prompts_file, "r") as f:
-        file_prompts = f.readlines()
-        prompts = []
-        for p in file_prompts:
-            prompt = p.strip()
-            if mode != "base":
-                if mode == "prefix":
-                    phrase = np.random.choice(phrases)
-                    prompt = phrase + prompt
-                elif mode == "suffix":
-                    phrase = np.random.choice(phrases)
-                    prompt = prompt + phrase
-                elif mode == "insertion":
-                    phrase = np.random.choice(phrases)
-                    insert_idx = np.random.randint(0, len(prompt))
-                    prompt = prompt[:insert_idx] + phrase + prompt[insert_idx:]
-            prompts.append(prompt)
+    prompts = get_harmful_prompts(hidden_harmful)
 
     # Sample a random subset of the prompts
     if num_prompts > 0:
@@ -788,29 +741,10 @@ elif eval_type == "roc_curve":
     roc["fpr"].append(100)
     roc["tpr"].append(100)
 
-    results[ec_variant] = roc
-
     if wandb_log:
         wandb.log(roc)
 
 elif eval_type == "smoothing":
-    # Check the mode
-    if mode != "base":
-        print(f"Evaluating with mode: {mode}")
-        if mode == "prefix":
-            phrases_file = prefsuffix_file
-        elif mode == "suffix":
-            phrases_file = prefsuffix_file
-        elif mode == "insertion":
-            phrases_file = insertion_file
-        else:
-            raise ValueError("Invalid mode: " + mode)
-        
-        # Load phrases from text file
-        with open(phrases_file, "r") as f:
-            phrases = f.readlines()
-            phrases = [phrase.strip() for phrase in phrases]
-
     # Harmful prompts
     print("\nEvaluating harmful prompts from: " + harmful_prompts_file + "\n")
     # Load prompts from text file
@@ -874,46 +808,10 @@ elif eval_type == "smoothing":
                 "certified_accuracy": certified_accuracy[i]
             })
 
-    results[str(dict(max_erase = max_erase))] = dict(certified_accuracy = certified_accuracy)
-
 elif eval_type == "harmful":
-    # Check the mode
-    if mode != "base":
-        print(f"Evaluating with mode: {mode}")
-        if mode == "prefix":
-            phrases_file = prefsuffix_file
-        elif mode == "suffix":
-            phrases_file = prefsuffix_file
-        elif mode == "insertion":
-            phrases_file = insertion_file
-        else:
-            raise ValueError("Invalid mode: " + mode)
-        
-        # Load phrases from text file
-        with open(phrases_file, "r") as f:
-            phrases = f.readlines()
-            phrases = [phrase.strip() for phrase in phrases]
-
     # Harmful prompts
     print("\nEvaluating harmful prompts from: " + harmful_prompts_file + "\n")
-    # Load prompts from text file
-    with open(harmful_prompts_file, "r") as f:
-        file_prompts = f.readlines()
-        prompts = []
-        for p in file_prompts:
-            prompt = p.strip()
-            if mode != "base":
-                if mode == "prefix":
-                    phrase = np.random.choice(phrases)
-                    prompt = phrase + prompt
-                elif mode == "suffix":
-                    phrase = np.random.choice(phrases)
-                    prompt = prompt + phrase
-                elif mode == "insertion":
-                    phrase = np.random.choice(phrases)
-                    insert_idx = np.random.randint(0, len(prompt))
-                    prompt = prompt[:insert_idx] + phrase + prompt[insert_idx:]
-            prompts.append(prompt)
+    prompts = get_harmful_prompts()
 
     # Sample a random subset of the prompts
     if num_prompts > 0:
@@ -949,20 +847,12 @@ elif eval_type == "harmful":
         
     percent_harmful = count_harmful / num_prompts * 100
 
-    # Save results
-    # results["percent_harmful"] = percent_harmful
-
     if wandb_log:
         wandb.log({
             "percent_harmful": percent_harmful
         })
 
 print("")
-
-# Save results
-# print("Saving results to " + results_file)
-# with open(results_file, "w") as f:
-#     json.dump(results, f, indent=2)
 
 if wandb_log:
     wandb.finish()
