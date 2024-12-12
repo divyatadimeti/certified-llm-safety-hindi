@@ -509,48 +509,43 @@ elif eval_type == "grad_ec":
         print("Option --use_classifier must be turned on. GradEC only works with a trained safety classifier.")
         exit()
 
-    for adv_tok in range(0, 21, 2):
-        adv_prompts_file = "data/adversarial_prompts_t_" + str(adv_tok) + ".txt"
-        print("Evaluating on adversarial prompts from: " + adv_prompts_file)
-        # Load prompts from text file
-        with open(adv_prompts_file, "r") as f:
-            prompts = f.readlines()
-            prompts = [prompt.strip() for prompt in prompts]
+    # Harmful prompts
+    print("\nEvaluating harmful prompts from: " + harmful_prompts_file + "\n")
+    # Load prompts from text file
+    prompts = get_harmful_prompts()
 
-        # Sample a random subset of the prompts
-        if num_prompts > 0:
-            prompts = random.sample(prompts, num_prompts)
-        else:
-            num_prompts = len(prompts)
+    # Sample a random subset of the prompts
+    if num_prompts > 0:
+        prompts = random.sample(prompts, num_prompts)
+    else:
+        num_prompts = len(prompts)
 
-        # Check if the prompts are harmful
-        count_harmful = 0
-        start_time = time.time()
-        time_list = []
-        elapsed_time = 0
-        for i in range(num_prompts):
-            prompt = prompts[i]
-            harmful, _ = grad_ec(prompt, model, tokenizer, model.distilbert.embeddings.word_embeddings,
-                        num_iters=num_iters)        # , init_temp=float(num_iters/100), reg_const=1e-3)
-            
-            # harmful = is_harmful(prompt, model, tokenizer, num_iters=num_iters, init_temp=float(num_iters/100), reg_const=1e-3)
-            if harmful:
-                count_harmful += 1
+    # Check if the prompts are harmful
+    count_harmful = 0
+    start_time = time.time()
+    time_list = []
+    elapsed_time = 0
+    for i in range(num_prompts):
+        prompt = prompts[i]
+        harmful = grad_ec(prompt, model, tokenizer, num_iters=num_iters)
+        
+        if harmful:
+            count_harmful += 1
 
-            current_time = time.time()
-            time_list.append(current_time - start_time - elapsed_time)
-            elapsed_time = current_time - start_time
-            time_per_prompt = elapsed_time / (i + 1)
-            percent_harmful = count_harmful / (i + 1) * 100
-            print("    Checking safety... " + progress_bar((i + 1) / num_prompts) \
-                + f' Detected harmful = {percent_harmful:5.1f}%' \
-                + f' Time/prompt = {time_per_prompt:5.1f}s', end="\r", flush=True)
-            
-            if wandb_log:
-                wandb.log({
-                    f"percent_harmful_prompt_epoch": percent_harmful,
-                    f"time_per_prompt_prompt_epoch": time_per_prompt
-                })
+        current_time = time.time()
+        time_list.append(current_time - start_time - elapsed_time)
+        elapsed_time = current_time - start_time
+        time_per_prompt = elapsed_time / (i + 1)
+        percent_harmful = count_harmful / (i + 1) * 100
+        print("    Checking safety... " + progress_bar((i + 1) / num_prompts) \
+            + f' Detected harmful = {percent_harmful:5.1f}%' \
+            + f' Time/prompt = {time_per_prompt:5.1f}s', end="\r", flush=True)
+        
+        if wandb_log:
+            wandb.log({
+                f"percent_harmful_prompt_epoch": percent_harmful,
+                f"time_per_prompt_prompt_epoch": time_per_prompt
+            })
             
         print("")
 
