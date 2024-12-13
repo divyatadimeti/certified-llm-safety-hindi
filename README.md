@@ -2,6 +2,27 @@
 
 This repository contains code for our project on detecting adversarial prompts in Hindi-Devanagari. We aim to tackle adversarial prompting in Hindi by adapting [Erase-and-Check](https://github.com/aounon/certified-llm-safety) to the Hindi language. We perform several experiments to analyze the effectiveness of our approach with various models, prompts, and erasure modes. 
 
+## Important Folders and Files
+
+- **`hindi_data/`**  
+  Contains our generated Hindi prompts along with their English translations.
+
+- **`prompt_augmentation.py`**  
+  Implements logic for phrase augmentation and encapsulated augmentation of adversarial prompts.
+
+- **`defenses.py`**  
+  Contains the safety filter implementation based on the original paper.
+
+- **`safety_classifier.py`**  
+  Script to train the safety classifier on the prompts dataset.
+
+- **`main.py`**  
+  The main script to run evaluations on the test data with all necessary argument flags.
+
+- **Files ending in `_ec`**  
+  Implementations of various erase-and-check strategies relevant to our project.
+
+
 ## Installation
 
 To install the necessary dependencies, run the following command:
