@@ -237,9 +237,11 @@ else:
 
         # tokenizer = AutoTokenizer.from_pretrained("gpt2")
 
-if mode == "base" and use_classifier:
+if use_classifier:
     safe_prompts_file = f"{data_dir}/safe_prompts_test.txt"
     harmful_prompts_file = f"{data_dir}/harmful_prompts_test.txt"
+    prefsuffix_file = f"{data_dir}/prefsuffix.txt"
+    insertion_file = f"{data_dir}/insertion.txt"
 else:
     safe_prompts_file = f"{data_dir}/safe_prompts.txt"
     harmful_prompts_file = f"{data_dir}/harmful_prompts.txt"
@@ -758,7 +760,6 @@ elif eval_type == "all_data":
     count_harmful = 0
     batch_size = 10
     start_time = time.time()
-    # incorrect_indices = []
     for i in range(0, num_prompts, batch_size):
         batch = harmful_prompts[i:i+batch_size]
         # Evaluating the safety filter gives us certifed safety guarantees on
