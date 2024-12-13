@@ -13,18 +13,9 @@ def iterative_pruning_ec(prompt, model, tokenizer, num_iters=20, threshold=0.5, 
     device = model.device
     tokens = torch.tensor(tokenizer.encode(prompt)).unsqueeze(0).to(device)
 
-    # Convert tokens to float for gradient calculation
-    tokens_float = tokens.float()
+    # Create a copy of tokens for gradient calculation
+    tokens_float = tokens.clone().float().detach()
     tokens_float.requires_grad = True
-
-    # Use tokens_float for gradient calculation, but pass original tokens to the model
-    model_output = model(tokens)
-    output_class = model_output[0].argmax().item()
-
-    if output_class == 0:
-        if output_subsequence:
-            return True, prompt
-        return True
 
     for _ in range(num_iters):
         if tokens.shape[1] < 3:
@@ -33,17 +24,20 @@ def iterative_pruning_ec(prompt, model, tokenizer, num_iters=20, threshold=0.5, 
             return False
 
         # Calculate gradients
-        tokens.requires_grad = True
         model_output = model(tokens)
         loss = -model_output[0][0, 0]  # Negative of harmful class score
         loss.backward()
 
         # Find token with smallest gradient magnitude
-        token_gradients = tokens.grad.abs().sum(dim=-1).squeeze()
+        token_gradients = tokens_float.grad.abs().sum(dim=-1).squeeze()
         min_grad_index = token_gradients[1:-1].argmin().item() + 1  # Skip [CLS] and [SEP]
 
         # Erase token with smallest gradient
         tokens = torch.cat((tokens[:, :min_grad_index], tokens[:, min_grad_index+1:]), dim=1)
+        tokens_float = torch.cat((tokens_float[:, :min_grad_index], tokens_float[:, min_grad_index+1:]), dim=1)
+
+        # Zero gradients for the next iteration
+        tokens_float.grad.zero_()
 
         # Check if harmful
         model_output = model(tokens)
