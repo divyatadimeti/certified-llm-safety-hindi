@@ -6,7 +6,7 @@ import math
 
 from defenses import progress_bar
 
-def simulated_annealing_ec(prompt, model, tokenizer, num_iters=20, threshold=0.5, output_subsequence=False, initial_temp=1.0, cooling_rate=0.95):
+def simulated_annealing_ec(prompt, model, tokenizer, num_iters=20, threshold=0.5, output_subsequence=False, initial_temp=1.8, cooling_rate=0.6):
     '''
     Implements the simulated annealing version of the erase-and-check procedure.
     At each step, the algorithm erases a token from the current prompt and evaluates
