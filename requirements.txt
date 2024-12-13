@@ -1,0 +1,9 @@
+huggingface
+transformers
+accelerate
+scikit-learn
+seaborn
+wandb
+openai
+tiktoken
+sentencepiece
