@@ -13,6 +13,9 @@ def iterative_pruning_ec(prompt, model, tokenizer, num_iters=20, threshold=0.5, 
     device = model.device
     tokens = torch.tensor(tokenizer.encode(prompt)).unsqueeze(0).to(device)
 
+    # Convert tokens to float
+    tokens = tokens.float()
+
     model_output = model(tokens)
     output_class = model_output[0].argmax().item()
 
