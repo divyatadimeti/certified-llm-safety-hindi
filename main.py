@@ -760,6 +760,7 @@ elif eval_type == "harmful":
         # Evaluating the safety filter gives us certifed safety guarantees on
         # erase_and_check for harmful prompts (from construction).
         harmful = is_harmful(batch, pipeline, tokenizer, llm_name=llm_name, max_llm_sequence_len=max_seq_len)
+        incorrect_indices = np.where(harmful == 0)[0] + (i * batch_size)
         count_harmful += sum(harmful)
 
         current_time = time.time()
@@ -774,13 +775,15 @@ elif eval_type == "harmful":
         if wandb_log:
             wandb.log({
                 f"percent_harmful_prompt_epoch": percent_harmful,
-                f"time_per_prompt_prompt_epoch": time_per_prompt
+                f"time_per_prompt_prompt_epoch": time_per_prompt,
+                f"incorrect_predictions": incorrect_indices
             })
 
         if i + batch_size >= num_prompts:
             # Process the remaining batch
             batch = prompts[i+batch_size:]
             harmful = is_harmful(batch, pipeline, tokenizer, llm_name=llm_name, max_llm_sequence_len=max_seq_len)
+            incorrect_indices = np.where(harmful == 0)[0] + (i * batch_size)
             count_harmful += sum(harmful)
             current_time = time.time()
             elapsed_time = current_time - start_time
@@ -793,7 +796,8 @@ elif eval_type == "harmful":
             if wandb_log:
                 wandb.log({
                     f"percent_harmful_prompt_epoch": percent_harmful,
-                    f"time_per_prompt_prompt_epoch": time_per_prompt
+                    f"time_per_prompt_prompt_epoch": time_per_prompt,
+                    f"incorrect_predictions": incorrect_indices
                 })
 
     print("")
