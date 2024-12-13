@@ -239,7 +239,7 @@ else:
 
         # tokenizer = AutoTokenizer.from_pretrained("gpt2")
 
-if mode == "base":
+if mode == "base" and use_classifier:
     safe_prompts_file = f"{data_dir}/safe_prompts_test.txt"
     harmful_prompts_file = f"{data_dir}/harmful_prompts_test.txt"
 else:
