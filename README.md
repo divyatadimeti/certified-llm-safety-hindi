@@ -15,6 +15,8 @@ pip install -r requirements.txt
 
 ## Training the Safety Classifiers
 
+![Train and Validation Loss](train_val_loss.png)
+
 ## Basic Inference on Safety Classifiers
 We perform inference on both LLama2 and fine-tuned safety classifiers, loaded from model paths.
 
