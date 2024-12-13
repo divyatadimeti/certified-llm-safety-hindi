@@ -835,7 +835,7 @@ elif eval_type == "all_data":
         harmful = is_harmful(batch, pipeline, tokenizer, llm_name=llm_name, max_llm_sequence_len=max_seq_len)
         incorrect_indices = np.where(harmful == 1)[0] + (i * batch_size)
         count_safe += len(harmful) - sum(harmful)
-        y_pred_safe.extend(~harmful)
+        y_pred_safe.extend(1 - np.array(harmful))
 
         current_time = time.time()
         elapsed_time = current_time - start_time
@@ -859,7 +859,7 @@ elif eval_type == "all_data":
             harmful = is_harmful(batch, pipeline, tokenizer, llm_name=llm_name, max_llm_sequence_len=max_seq_len)
             incorrect_indices = np.where(harmful == 1)[0] + (i * batch_size)
             count_safe += len(harmful) - sum(harmful)
-            y_pred_safe.extend(~harmful)
+            y_pred_safe.extend(1 - np.array(harmful))
 
             current_time = time.time()
             elapsed_time = current_time - start_time
