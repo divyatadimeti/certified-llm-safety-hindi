@@ -46,7 +46,7 @@ def get_safe_prompts(safe_prompts_file):
             safe_prompts.append(prompt)
     return safe_prompts
 
-def get_harmful_prompts(harmful_prompts_file, mode, phrases, hidden_harmful):
+def get_harmful_prompts(harmful_prompts_file, mode, hidden_harmful, phrases=None):
     """
     Loads the harmful prompts from the text file and returns them. Applies the phrase-augmentated and encapsulation-augmented 
     mode to the prompts if specified.
@@ -63,7 +63,7 @@ def get_harmful_prompts(harmful_prompts_file, mode, phrases, hidden_harmful):
     with open(harmful_prompts_file, "r") as f:
         file_prompts = f.readlines()
         harmful_prompts = []
-        if mode != "base":
+        if phrases is not None:
             phrase = np.random.choice(phrases)
         for p in file_prompts:
             prompt = p.strip()
