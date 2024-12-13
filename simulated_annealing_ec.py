@@ -1,58 +1,77 @@
 import torch
 from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
 import argparse, time, json, os
+import random
+import math
 
 from defenses import progress_bar
 
-def iterative_pruning_ec(prompt, model, tokenizer, num_iters=20, threshold=0.5, output_subsequence=False):
+def simulated_annealing_ec(prompt, model, tokenizer, num_iters=20, threshold=0.5, output_subsequence=False, initial_temp=1.0, cooling_rate=0.95):
     '''
-    Implements an iterative pruning version of the erase-and-check procedure.
-    At each step, the algorithm removes the token with the least impact on the harmful class score.
+    Implements the simulated annealing version of the erase-and-check procedure.
+    At each step, the algorithm erases a token from the current prompt and evaluates
+    the harmfulness. It accepts changes that increase harmfulness and occasionally
+    accepts less optimal changes to escape local optima.
+
+    Args:
+        prompt: Input prompt (string)
+        model: Safety classifier
+        tokenizer: Tokenizer for the safety classifier
+        num_iters: Number of iterations
+        initial_temp: Initial temperature for simulated annealing
+        cooling_rate: Rate at which the temperature decreases
+
+    Returns:
+        True if the prompt is harmful, False otherwise
     '''
 
     device = model.device
+
+    # Tokenize prompt
     tokens = torch.tensor(tokenizer.encode(prompt)).unsqueeze(0).to(device)
 
-    # Create a copy of tokens for gradient calculation
-    tokens_float = tokens.clone().float().detach()
-    tokens_float.requires_grad = True
+    # Get initial model output
+    model_output = model(tokens)
+    output_class = model_output[0].argmax().item()
 
+    # If the prompt is initially labelled harmful, return True
+    if output_class == 0:
+        if output_subsequence:
+            return True, prompt
+        return True
+
+    # Initialize temperature
+    temperature = initial_temp
+
+    # Simulated annealing loop
     for _ in range(num_iters):
-        if tokens.shape[1] < 3:
+        if tokens.shape[1] < 3:  # Ensure there are enough tokens to erase
             if output_subsequence:
                 return False, prompt
             return False
 
-        # Set model to train mode to ensure gradients are computed
-        model.train()
+        # Randomly select a token to erase
+        i = random.randint(1, tokens.shape[1] - 2)  # Avoid special tokens [CLS] and [SEP]
+        erased_sequence = torch.cat((tokens[:, :i], tokens[:, i+1:]), dim=1)
 
-        # Use tokens_float for model input to ensure gradients are computed
-        model_output = model(tokens_float.long())
-        loss = -model_output.logits[0, 0]  # Negative of harmful class score
-        loss.backward()
+        # Get model output for the erased sequence
+        model_output = model(erased_sequence)
+        output_softmax = torch.nn.functional.softmax(model_output[0], dim=1)
+        harmful_score = output_softmax[0, 0].item()
 
-        # Check if gradients are computed
-        if tokens_float.grad is None:
-            raise RuntimeError("Gradients were not computed for tokens_float.")
+        # Calculate acceptance probability
+        current_score = torch.nn.functional.softmax(model(tokens)[0], dim=1)[0, 0].item()
+        acceptance_probability = math.exp((harmful_score - current_score) / temperature)
 
-        # Find token with smallest gradient magnitude
-        token_gradients = tokens_float.grad.abs().sum(dim=-1).squeeze()
-        min_grad_index = token_gradients[1:-1].argmin().item() + 1  # Skip [CLS] and [SEP]
+        # Decide whether to accept the new sequence
+        if harmful_score > current_score or random.random() < acceptance_probability:
+            tokens = erased_sequence
 
-        # Erase token with smallest gradient
-        tokens = torch.cat((tokens[:, :min_grad_index], tokens[:, min_grad_index+1:]), dim=1)
-        tokens_float = torch.cat((tokens_float[:, :min_grad_index], tokens_float[:, min_grad_index+1:]), dim=1)
+        # Cool down the temperature
+        temperature *= cooling_rate
 
-        # Zero gradients for the next iteration
-        tokens_float.grad.zero_()
-
-        # Set model back to evaluation mode
-        model.eval()
-
-        # Check if harmful
-        model_output = model(tokens)
-        output_softmax = torch.nn.functional.softmax(model_output.logits, dim=1)
-        if output_softmax[0, 0].item() > threshold:
+        # Check if the current sequence is harmful
+        if harmful_score > threshold:
             if output_subsequence:
                 return True, tokenizer.decode(tokens, skip_special_tokens=True)
             return True
@@ -67,9 +86,7 @@ if __name__ == '__main__':
     parser.add_argument('--prompts_file', type=str, default='data/adversarial_prompts_t_20.txt', help='File containing prompts')
     parser.add_argument('--num_iters', type=int, default=20, help='Number of iterations')
     parser.add_argument('--model_wt_path', type=str, default='models/distilbert_suffix.pt', help='Path to model weights')
-    parser.add_argument('--results_file', type=str, default='results/iterative_pruning_results.json', help='File to store results')
-    parser.add_argument('--threshold', type=float, default=0.5, help='Threshold for harmful classification')
-    parser.add_argument('--output_subsequence', action='store_true', help='Output the harmful subsequence if found')
+    parser.add_argument('--results_file', type=str, default='results/simulated_annealing_ec_results.json', help='File to store results')
 
     args = parser.parse_args()
 
@@ -83,21 +100,19 @@ if __name__ == '__main__':
     # Load model weights
     model_wt_path = args.model_wt_path
     
-    model.load_state_dict(torch.load(model_wt_path, map_location=device))
+    model.load_state_dict(torch.load(model_wt_path))
     model.to(device)
     model.eval()
 
     prompts_file = args.prompts_file
     num_iters = args.num_iters
     results_file = args.results_file
-    threshold = args.threshold
-    output_subsequence = args.output_subsequence
 
-    print('\n* * * * * Experiment Parameters * * * * *')
-    print('Prompts file: ' + prompts_file)
-    print('Number of iterations: ' + str(num_iters))
-    print('Model weights: ' + model_wt_path)
-    print('* * * * * * * * * * * * * * * * * * * * *\n')
+    print('\n* * * * * * * Experiment Details * * * * * * *')
+    print('Prompts file:\t', prompts_file)
+    print('Iterations:\t', str(num_iters))
+    print('Model weights:\t', model_wt_path)
+    print('* * * * * * * * * * * ** * * * * * * * * * * *\n')
 
     # Load prompts
     prompts = []
@@ -119,7 +134,7 @@ if __name__ == '__main__':
         results_dict = json.load(f)
 
     for num_done, input_prompt in enumerate(prompts):
-        decision = iterative_pruning_ec(input_prompt, model, tokenizer, num_iters, threshold, output_subsequence)
+        decision = simulated_annealing_ec(input_prompt, model, tokenizer, num_iters)
         list_of_bools.append(decision)
 
         percent_harmful = (sum(list_of_bools) / len(list_of_bools)) * 100.
@@ -135,5 +150,6 @@ if __name__ == '__main__':
 
     # Save results
     results_dict[str(dict(num_iters = num_iters))] = dict(percent_harmful = percent_harmful, time_per_prompt = time_per_prompt)
+    print("Saving results to", results_file)
     with open(results_file, 'w') as f:
         json.dump(results_dict, f, indent=2)
