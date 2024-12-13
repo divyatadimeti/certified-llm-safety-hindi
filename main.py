@@ -382,7 +382,7 @@ if eval_type == "ec_all_data":
         harmful = erase_and_check(prompt, pipeline, tokenizer, max_erase=max_erase, num_adv=num_adv, randomized=randomize,
                                   prompt_sampling_ratio=sampling_ratio, mode=mode, llm_name=llm_name)
         
-        y_pred_safe.append(0 if harmful else 1)
+        y_pred_safe.append(1 if harmful else 0)
         if not harmful:
             count_safe += 1
 
