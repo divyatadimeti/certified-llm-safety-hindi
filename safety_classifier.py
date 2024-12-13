@@ -1,4 +1,4 @@
-#Code adapted from the official implementation of Erase-and-Check method:
+# Code adapted from the official implementation of Erase-and-Check method:
 # https://github.com/aounon/certified-llm-safety
 
 import wandb
