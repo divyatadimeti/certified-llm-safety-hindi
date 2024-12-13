@@ -16,16 +16,16 @@ from defenses import is_harmful
 from defenses import progress_bar, erase_and_check
 from greedy_ec import greedy_ec
 from beam_search_ec import beam_search_ec
-from iter_pruning_ec import iterative_pruning_ec
 from openai import OpenAI
 
+from simulated_annealing_ec import simulated_annealing_ec
 parser = argparse.ArgumentParser(description='Check safety of prompts.')
 parser.add_argument('--mode', type=str, default="base", choices=["base", "suffix", "insertion", "prefix"],
                     help='attack mode to defend against')
 parser.add_argument("--hidden_harmful", action="store_true", help="use hidden harmful prompts within safe prompts")
 parser.add_argument('--data_dir', type=str, default="data",
                     help='directory containing the prompts')
-parser.add_argument('--eval_type', type=str, default="all_data", choices=["all_data", "greedy_ec", "ec_all_data", "beam_search_ec", "iter_pruning_ec"],
+parser.add_argument('--eval_type', type=str, default="all_data", choices=["all_data", "greedy_ec", "ec_all_data", "beam_search_ec", "simulated_annealing_ec"],
                     help='type of prompts to evaluate')
 parser.add_argument('--max_erase', type=int, default=20,
                     help='maximum number of tokens to erase')
@@ -501,7 +501,7 @@ elif eval_type == "beam_search_ec":
                 "time_per_prompt_standard_error": time_per_prompt_se
             })
 
-elif eval_type == "iter_pruning_ec":
+elif eval_type == "simulated_annealing_ec":
     # Evaluating the performance of BeamSearchEC on adversarial prompts
     if not use_classifier:
         print("Option --use_classifier must be turned on. BeamSearchEC only works with a trained safety classifier.")
@@ -520,7 +520,7 @@ elif eval_type == "iter_pruning_ec":
     elapsed_time = 0
     for i in range(num_prompts):
         prompt = prompts[i]
-        harmful = iterative_pruning_ec(prompt, model, tokenizer, num_iters=num_iters)
+        harmful = simulated_annealing_ec(prompt, model, tokenizer, num_iters=num_iters)
         
         if harmful:
             count_harmful += 1
