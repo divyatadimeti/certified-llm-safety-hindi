@@ -238,6 +238,7 @@ else:
         # tokenizer = AutoTokenizer.from_pretrained("gpt2")
 
 if use_classifier:
+    print("Using fine-tuned classifier")
     safe_prompts_file = f"{data_dir}/safe_prompts_test.txt"
     harmful_prompts_file = f"{data_dir}/harmful_prompts_test.txt"
     prefsuffix_file = f"{data_dir}/prefsuffix.txt"

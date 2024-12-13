@@ -67,6 +67,7 @@ def is_harmful(prompts, pipeline, tokenizer, no_sys_prompt=False, min_length=5, 
         list_of_bools = []
 
         for i in range(len(outputs)):
+            print(outputs[i]['label'])
             if outputs[i]['label'] == 'LABEL_0':        # LABEL_0 --> Harmful
                 list_of_bools.append(True)
             else:
