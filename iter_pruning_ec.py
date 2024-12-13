@@ -23,6 +23,9 @@ def iterative_pruning_ec(prompt, model, tokenizer, num_iters=20, threshold=0.5, 
                 return False, prompt
             return False
 
+        # Set model to train mode to ensure gradients are computed
+        model.train()
+
         # Use tokens_float for model input to ensure gradients are computed
         model_output = model(tokens_float.long())
         loss = -model_output.logits[0, 0]  # Negative of harmful class score
@@ -42,6 +45,9 @@ def iterative_pruning_ec(prompt, model, tokenizer, num_iters=20, threshold=0.5, 
 
         # Zero gradients for the next iteration
         tokens_float.grad.zero_()
+
+        # Set model back to evaluation mode
+        model.eval()
 
         # Check if harmful
         model_output = model(tokens)
