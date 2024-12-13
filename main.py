@@ -835,7 +835,7 @@ elif eval_type == "all_data":
         # erase_and_check for harmful prompts (from construction).
         harmful = is_harmful(batch, pipeline, tokenizer, llm_name=llm_name, max_llm_sequence_len=max_seq_len)
         count_safe += len(harmful) - sum(harmful)
-        y_pred_safe.extend(1 - np.array(harmful))
+        y_pred_safe.extend(harmful)
 
         current_time = time.time()
         elapsed_time = current_time - start_time
