@@ -14,12 +14,14 @@ from sklearn.metrics import f1_score, precision_score, recall_score
 
 from defenses import is_harmful
 from defenses import progress_bar, erase_and_check
+from prompt_augmentation import get_phrases, get_safe_prompts, get_harmful_prompts
 from greedy_ec import greedy_ec
 from beam_search_ec import beam_search_ec
 from openai import OpenAI
 
 from simulated_annealing_ec import simulated_annealing_ec
 parser = argparse.ArgumentParser(description='Check safety of prompts.')
+# -- Erase and Check arguments -- #
 parser.add_argument('--mode', type=str, default="base", choices=["base", "suffix", "insertion", "prefix"],
                     help='attack mode to defend against')
 parser.add_argument("--hidden_harmful", action="store_true", help="use hidden harmful prompts within safe prompts")
@@ -29,16 +31,9 @@ parser.add_argument('--eval_type', type=str, default="all_data", choices=["all_d
                     help='type of prompts to evaluate')
 parser.add_argument('--max_erase', type=int, default=20,
                     help='maximum number of tokens to erase')
-
-# -- Randomizer arguments -- #
-parser.add_argument('--randomize', action='store_true',
-                    help="Use randomized check")
-parser.add_argument('--sampling_ratio', type=float, default=0.1,
-                    help="Ratio of subsequences to evaluate (if randomize=True)")
-# -------------------------- #
-
-parser.add_argument('--results_dir', type=str, default="results",
-                    help='directory to save results')
+parser.add_argument('--num_iters', type=float, default=0.1,
+                    help='number of iterations for the Erase-and-Check procedure for GreedyEC')
+# -- Safety Classifier arguments -- #
 parser.add_argument('--use_classifier', action='store_true',
                     help='flag for using a custom trained safety filter')
 parser.add_argument('--classifier_name', type=str, default="distilbert", choices=["distilbert", "distilbert-multi", "indicbert"],
@@ -49,12 +44,6 @@ parser.add_argument('--llm_name', type=str, default="Llama-2", choices=["Llama-2
                     help='name of the LLM model (used only when use_classifier=False)')
 parser.add_argument('--max_seq_len', type=int, default=200,
                     help='maximum sequence length for the LLM')
-
-# -- GradEC arguments -- #
-parser.add_argument('--num_iters', type=int, default=10,
-                    help='number of iterations for GradEC, GreedyEC')
-parser.add_argument('--ec_variant', type=str, default="RandEC", choices=["RandEC", "GreedyEC", "GradEC", "GreedyGradEC"],
-                    help='variant of EC to evaluate for ROC')
 
 # -- Wandb logging arguments -- #
 parser.add_argument('--wandb_log', action='store_true',
@@ -78,8 +67,6 @@ use_classifier = args.use_classifier
 classifier_name = args.classifier_name
 model_wt_path = args.model_wt_path
 max_seq_len = args.max_seq_len
-randomize = args.randomize
-sampling_ratio = args.sampling_ratio
 num_iters = args.num_iters
 llm_name = args.llm_name
 wandb_log = args.wandb_log
@@ -90,9 +77,6 @@ print("\n* * * * * * Experiment Details * * * * * *")
 if torch.cuda.is_available():
     print("Device: " + torch.cuda.get_device_name(0))
 print("Evaluation type: " + eval_type)
-print("Use randomization? " + str(randomize))
-if randomize:
-    print("Sampling ratio: ", str(sampling_ratio))
 
 if use_classifier:
     print("Using custom safety filter. Model weights path: " + model_wt_path)
@@ -101,8 +85,7 @@ else:
 if eval_type == "safe" or eval_type == "empirical":
     print("Mode: " + mode)
     print("Maximum tokens to erase: " + str(max_erase))
-elif eval_type == "grad_ec" or eval_type == "greedy_ec":
-    print("Number of iterations: " + str(num_iters))
+
 
 # Log the experiment configuration to wandb
 if wandb_log:
@@ -111,9 +94,6 @@ if wandb_log:
         "mode": mode,
         "eval_type": eval_type,
         "max_erase": max_erase,
-        "num_iters": num_iters,
-        "randomize": randomize,
-        "sampling_ratio": sampling_ratio,
         "use_classifier": use_classifier,
         "classifier_name": classifier_name,
         "model_wt_path": model_wt_path,
@@ -208,61 +188,8 @@ else:
     prefsuffix_file = f"{data_dir}/prefsuffix.txt"
     insertion_file = f"{data_dir}/insertion.txt"
 
-def get_phrases():
-    # Check the mode
-    print(f"Evaluating with mode: {mode}")
-    if mode == "prefix":
-        phrases_file = prefsuffix_file
-    elif mode == "suffix":
-        phrases_file = prefsuffix_file
-    elif mode == "insertion":
-        phrases_file = insertion_file
-    else:
-        raise ValueError("Invalid mode: " + mode)
-    
-    # Load phrases from text file
-    with open(phrases_file, "r") as f:
-        phrases = f.readlines()
-        phrases = [phrase.strip() for phrase in phrases]
-    return phrases
-
 if mode != "base":
     phrases = get_phrases()
-
-def get_safe_prompts():
-    with open(safe_prompts_file, "r") as f:
-        file_prompts = f.readlines()
-        safe_prompts = []
-        for p in file_prompts:
-            prompt = p.strip()
-            safe_prompts.append(prompt)
-    return safe_prompts
-
-def get_harmful_prompts():
-    # Load prompts from text file
-    with open(harmful_prompts_file, "r") as f:
-        file_prompts = f.readlines()
-        harmful_prompts = []
-        if mode != "base":
-            phrase = np.random.choice(phrases)
-        for p in file_prompts:
-            prompt = p.strip()
-            if hidden_harmful:
-                safe_prompts = get_safe_prompts()
-                sel_safe_prompts = random.sample(safe_prompts, 2)
-                padded_prompt = sel_safe_prompts[0] + prompt + sel_safe_prompts[1]
-                harmful_prompts.append(padded_prompt)
-            else:
-                if mode != "base":
-                    if mode == "prefix":
-                        prompt = phrase + prompt
-                    elif mode == "suffix":
-                        prompt = prompt + phrase
-                    elif mode == "insertion":
-                        insert_idx = np.random.randint(0, len(prompt))
-                        prompt = prompt[:insert_idx] + phrase + prompt[insert_idx:]
-                harmful_prompts.append(prompt)
-    return harmful_prompts
 
 if eval_type == "ec_all_data":
     # Check the mode
@@ -270,11 +197,11 @@ if eval_type == "ec_all_data":
 
     # Harmful prompts
     print("\nEvaluating harmful prompts from: " + harmful_prompts_file + "\n")
-    harmful_prompts = get_harmful_prompts()
+    harmful_prompts = get_harmful_prompts(harmful_prompts_file, mode, phrases, hidden_harmful)
 
     # Safe prompts
     print("\nEvaluating safe prompts from: " + safe_prompts_file + "\n")
-    safe_prompts = get_safe_prompts()
+    safe_prompts = get_safe_prompts(safe_prompts_file)
 
     # Check if the prompts are harmful
     count_harmful = 0
@@ -286,8 +213,7 @@ if eval_type == "ec_all_data":
     for i in range(len(harmful_prompts)):
         prompt = harmful_prompts[i]
         # if args.append_adv: prompt += adv_suffix
-        harmful = erase_and_check(prompt, pipeline, tokenizer, max_erase=max_erase, num_adv=num_adv, randomized=randomize,
-                                  prompt_sampling_ratio=sampling_ratio, mode=mode, llm_name=llm_name)
+        harmful = erase_and_check(prompt, pipeline, tokenizer, max_erase=max_erase, mode=mode, llm_name=llm_name)
         
 
         y_pred_harmful.append(1 if harmful else 0)
@@ -341,8 +267,7 @@ if eval_type == "ec_all_data":
     for i in range(len(safe_prompts)):
         prompt = safe_prompts[i]
         # if args.append_adv: prompt += adv_suffix
-        harmful = erase_and_check(prompt, pipeline, tokenizer, max_erase=max_erase, num_adv=num_adv, randomized=randomize,
-                                  prompt_sampling_ratio=sampling_ratio, mode=mode, llm_name=llm_name)
+        harmful = erase_and_check(prompt, pipeline, tokenizer, max_erase=max_erase, mode=mode, llm_name=llm_name)
         
         y_pred_safe.append(1 if harmful else 0)
         if not harmful:
@@ -401,7 +326,7 @@ elif eval_type == "greedy_ec":
     # Harmful prompts
     print("\nEvaluating harmful prompts from: " + harmful_prompts_file + "\n")
     # Load prompts from text file
-    prompts = get_harmful_prompts()
+    prompts = get_harmful_prompts(harmful_prompts_file, mode, phrases, hidden_harmful)
 
     num_prompts = len(prompts)
 
@@ -512,7 +437,7 @@ elif eval_type == "simulated_annealing_ec":
 
     # Harmful prompts
     print("\nEvaluating harmful prompts from: " + harmful_prompts_file + "\n")
-    prompts = get_harmful_prompts()
+    prompts = get_harmful_prompts(harmful_prompts_file, mode, phrases, hidden_harmful)
 
     num_prompts = len(prompts)
 
@@ -563,7 +488,7 @@ elif eval_type == "simulated_annealing_ec":
 elif eval_type == "all_data":
     # Harmful prompts
     print("\nEvaluating harmful prompts from: " + harmful_prompts_file + "\n")
-    harmful_prompts = get_harmful_prompts()
+    harmful_prompts = get_harmful_prompts(harmful_prompts_file, mode, phrases, hidden_harmful)
 
     num_prompts = len(harmful_prompts)
 
@@ -626,7 +551,7 @@ elif eval_type == "all_data":
         })
     # Safe prompts
     print("\nEvaluating safe prompts from: " + safe_prompts_file + "\n")
-    safe_prompts = get_safe_prompts()
+    safe_prompts = get_safe_prompts(safe_prompts_file)
 
     num_prompts = len(safe_prompts)
 

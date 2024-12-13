@@ -14,7 +14,7 @@ import transformers
 from transformers import AdamW
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
-from transformers import DistilBertTokenizer, DistilBertForSequenceClassification, AutoTokenizer, AutoModelForSequenceClassification
+from transformers import DistilBertTokenizer, DistilBertForSequenceClassification, AutoModelForSequenceClassification
 from torch.utils.data import TensorDataset, DataLoader, WeightedRandomSampler, SequentialSampler
 
 # Specify the available devices
