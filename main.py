@@ -76,15 +76,12 @@ print("\n* * * * * * Experiment Details * * * * * *")
 if torch.cuda.is_available():
     print("Device: " + torch.cuda.get_device_name(0))
 print("Evaluation type: " + eval_type)
+print(f"Evaluating with mode: {mode}")
 
 if use_classifier:
     print("Using custom safety filter. Model weights path: " + model_wt_path)
 else:
     print("Using LLM model: " + llm_name)
-if eval_type == "safe" or eval_type == "empirical":
-    print("Mode: " + mode)
-    print("Maximum tokens to erase: " + str(max_erase))
-
 
 # Log the experiment configuration to wandb
 if wandb_log:
@@ -123,34 +120,14 @@ if use_classifier:
 
 else:
     # Using LLM for safety filter
-    if llm_name == "Llama-2":
+    if llm_name == "Llama-2" or llm_name == "Llama-2-13B" or llm_name == "Llama-3":
         # Load model and tokenizer
-        model = "meta-llama/Llama-2-7b-chat-hf"
-
-        print(f'Loading model {model}...')
-        tokenizer = AutoTokenizer.from_pretrained(model)
-        pipeline = transformers.pipeline(
-            "text-generation",
-            model=model,
-            torch_dtype=torch.float16,
-            device_map="auto"
-        )
-
-    elif llm_name == "Llama-2-13B":
-        # Load model and tokenizer
-        model = "meta-llama/Llama-2-13b-chat-hf"
-
-        print(f'Loading model {model}...')
-        tokenizer = AutoTokenizer.from_pretrained(model)
-        pipeline = transformers.pipeline(
-            "text-generation",
-            model=model,
-            torch_dtype=torch.float16,
-            device_map="auto")
-
-    elif llm_name == "Llama-3":
-        # Load model and tokenizer
-        model = "meta-llama/Meta-Llama-3-8B-Instruct"
+        if llm_name == "Llama-2":
+            model = "meta-llama/Llama-2-7b-chat-hf"
+        elif llm_name == "Llama-2-13B":
+            model = "meta-llama/Llama-2-13b-chat-hf"
+        elif llm_name == "Llama-3":
+            model = "meta-llama/Meta-Llama-3-8B-Instruct"
 
         print(f'Loading model {model}...')
         tokenizer = AutoTokenizer.from_pretrained(model)
@@ -176,23 +153,24 @@ if use_classifier:
     print("Using fine-tuned classifier")
     safe_prompts_file = f"{data_dir}/safe_prompts_test.txt"
     harmful_prompts_file = f"{data_dir}/harmful_prompts_test.txt"
-    prefsuffix_file = f"{data_dir}/prefsuffix.txt"
-    insertion_file = f"{data_dir}/insertion.txt"
 else:
     safe_prompts_file = f"{data_dir}/safe_prompts.txt"
     harmful_prompts_file = f"{data_dir}/harmful_prompts.txt"
-    prefsuffix_file = f"{data_dir}/prefsuffix.txt"
-    insertion_file = f"{data_dir}/insertion.txt"
+
+prefsuffix_file = f"{data_dir}/prefsuffix.txt"
+insertion_file = f"{data_dir}/insertion.txt"
 
 if mode == "base":
     phrases = None
 else:
     phrases = get_phrases(mode, prefsuffix_file, insertion_file)
 
-if eval_type == "ec_all_data":
-    # Check the mode
-    print(f"Evaluating with mode: {mode}")
-
+if eval_type == "ec_all_data" or eval_type == "greedy_ec" or eval_type == "beam_search_ec" or eval_type == "simulated_annealing_ec":
+    if eval_type == "greedy_ec" or eval_type == "beam_search_ec" or eval_type == "simulated_annealing_ec":
+        if not use_classifier:
+            print("Option --use_classifier must be turned on. GreedyEC only works with a trained safety classifier.")
+            exit()
+    
     # Harmful prompts
     print("\nEvaluating harmful prompts from: " + harmful_prompts_file + "\n")
     harmful_prompts = get_harmful_prompts(harmful_prompts_file, mode, hidden_harmful, phrases)
@@ -210,9 +188,18 @@ if eval_type == "ec_all_data":
     elapsed_time = 0
     for i in range(len(harmful_prompts)):
         prompt = harmful_prompts[i]
-        # if args.append_adv: prompt += adv_suffix
-        harmful = erase_and_check(prompt, pipeline, tokenizer, max_erase=max_erase, mode=mode, llm_name=llm_name)
         
+        if eval_type == "greedy_ec":
+            harmful = greedy_ec(prompt, model, tokenizer, num_iters=num_iters)
+        elif eval_type == "beam_search_ec":
+            harmful = beam_search_ec(prompt, model, tokenizer, num_iters=num_iters)
+        elif eval_type == "simulated_annealing_ec":
+            harmful = simulated_annealing_ec(prompt, model, tokenizer, num_iters=num_iters)
+        elif eval_type == "ec_all_data":
+            harmful = erase_and_check(prompt, pipeline, tokenizer, max_erase=max_erase, mode=mode, llm_name=llm_name)
+        else:
+            print(f"Invalid evaluation type {eval_type}")
+            exit()
 
         y_pred_harmful.append(1 if harmful else 0)
 
@@ -314,68 +301,7 @@ if eval_type == "ec_all_data":
             "precision": precision,
             "recall": recall
         })
-
-elif eval_type == "greedy_ec" or eval_type == "beam_search_ec" or eval_type == "simulated_annealing_ec":
-    # Evaluating the performance of GreedyEC on adversarial prompts
-    if not use_classifier:
-        print("Option --use_classifier must be turned on. GreedyEC only works with a trained safety classifier.")
-        exit()
-
-    # Harmful prompts
-    print("\nEvaluating harmful prompts from: " + harmful_prompts_file + "\n")
-    # Load prompts from text file
-    prompts = get_harmful_prompts(harmful_prompts_file, mode, hidden_harmful, phrases)
-
-    num_prompts = len(prompts)
-
-    # Check if the prompts are harmful
-    count_harmful = 0
-    start_time = time.time()
-    time_list = []
-    elapsed_time = 0
-    for i in range(num_prompts):
-        prompt = prompts[i]
-        if eval_type == "greedy_ec":
-            harmful = greedy_ec(prompt, model, tokenizer, num_iters=num_iters)
-        elif eval_type == "beam_search_ec":
-            harmful = beam_search_ec(prompt, model, tokenizer, num_iters=num_iters)
-        elif eval_type == "simulated_annealing_ec":
-            harmful = simulated_annealing_ec(prompt, model, tokenizer, num_iters=num_iters)
         
-        if harmful:
-            count_harmful += 1
-
-        current_time = time.time()
-        time_list.append(current_time - start_time - elapsed_time)
-        elapsed_time = current_time - start_time
-        time_per_prompt = elapsed_time / (i + 1)
-        percent_harmful = count_harmful / (i + 1) * 100
-        print("    Checking safety... " + progress_bar((i + 1) / num_prompts) \
-            + f' Detected harmful = {percent_harmful:5.1f}%' \
-            + f' Time/prompt = {time_per_prompt:5.1f}s', end="\r", flush=True)
-        
-        if wandb_log:
-            wandb.log({
-                f"percent_harmful_prompt_epoch": percent_harmful,
-                f"time_per_prompt_prompt_epoch": time_per_prompt
-            })
-            
-        print("")
-
-        # Compute standard error of the average time per prompt
-        time_per_prompt_se = torch.tensor(time_list).std().item() / (num_prompts ** 0.5)
-
-        avg_time_per_prompt = np.mean(time_list)
-        # Compute standard error of the percentage of harmful prompts
-        percent_harmful_se = (percent_harmful * (100 - percent_harmful) / (num_prompts - 1)) ** 0.5
-
-        if wandb_log:
-            wandb.log({
-                "percent_harmful_standard_error": percent_harmful_se,
-                "time_per_prompt_standard_error": time_per_prompt_se,
-                "avg_time_per_prompt": avg_time_per_prompt
-            })
-
 elif eval_type == "all_data":
     # Harmful prompts
     print("\nEvaluating harmful prompts from: " + harmful_prompts_file + "\n")
