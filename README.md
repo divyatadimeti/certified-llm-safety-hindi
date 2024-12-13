@@ -11,7 +11,7 @@ This repository contains code for our project on detecting adversarial prompts i
   Implements logic for phrase augmentation and encapsulated augmentation of adversarial prompts.
 
 - **`defenses.py`**  
-  Contains the safety filter implementation based on the original paper.
+  Contains the safety filter implementation from the original paper.
 
 - **`safety_classifier.py`**  
   Script to train the safety classifier on the prompts dataset.
