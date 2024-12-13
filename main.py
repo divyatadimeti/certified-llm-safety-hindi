@@ -195,7 +195,7 @@ if eval_type == "ec_all_data":
 
     # Harmful prompts
     print("\nEvaluating harmful prompts from: " + harmful_prompts_file + "\n")
-    harmful_prompts = get_harmful_prompts(harmful_prompts_file, mode, phrases, hidden_harmful)
+    harmful_prompts = get_harmful_prompts(harmful_prompts_file, mode, hidden_harmful, phrases)
 
     # Safe prompts
     print("\nEvaluating safe prompts from: " + safe_prompts_file + "\n")
@@ -315,7 +315,7 @@ if eval_type == "ec_all_data":
             "recall": recall
         })
 
-elif eval_type == "greedy_ec":
+elif eval_type == "greedy_ec" or eval_type == "beam_search_ec" or eval_type == "simulated_annealing_ec":
     # Evaluating the performance of GreedyEC on adversarial prompts
     if not use_classifier:
         print("Option --use_classifier must be turned on. GreedyEC only works with a trained safety classifier.")
@@ -324,7 +324,7 @@ elif eval_type == "greedy_ec":
     # Harmful prompts
     print("\nEvaluating harmful prompts from: " + harmful_prompts_file + "\n")
     # Load prompts from text file
-    prompts = get_harmful_prompts(harmful_prompts_file, mode, phrases, hidden_harmful)
+    prompts = get_harmful_prompts(harmful_prompts_file, mode, hidden_harmful, phrases)
 
     num_prompts = len(prompts)
 
@@ -335,7 +335,12 @@ elif eval_type == "greedy_ec":
     elapsed_time = 0
     for i in range(num_prompts):
         prompt = prompts[i]
-        harmful = greedy_ec(prompt, model, tokenizer, num_iters=num_iters)
+        if eval_type == "greedy_ec":
+            harmful = greedy_ec(prompt, model, tokenizer, num_iters=num_iters)
+        elif eval_type == "beam_search_ec":
+            harmful = beam_search_ec(prompt, model, tokenizer, num_iters=num_iters)
+        elif eval_type == "simulated_annealing_ec":
+            harmful = simulated_annealing_ec(prompt, model, tokenizer, num_iters=num_iters)
         
         if harmful:
             count_harmful += 1
@@ -361,118 +366,6 @@ elif eval_type == "greedy_ec":
         time_per_prompt_se = torch.tensor(time_list).std().item() / (num_prompts ** 0.5)
 
         avg_time_per_prompt = np.mean(time_list)
-        # Compute standard error of the percentage of harmful prompts
-        percent_harmful_se = (percent_harmful * (100 - percent_harmful) / (num_prompts - 1)) ** 0.5
-
-        if wandb_log:
-            wandb.log({
-                "percent_harmful_standard_error": percent_harmful_se,
-                "time_per_prompt_standard_error": time_per_prompt_se,
-                "avg_time_per_prompt": avg_time_per_prompt
-            })
-
-elif eval_type == "beam_search_ec":
-    # Evaluating the performance of BeamSearchEC on adversarial prompts
-    if not use_classifier:
-        print("Option --use_classifier must be turned on. BeamSearchEC only works with a trained safety classifier.")
-        exit()
-
-    # Harmful prompts
-    print("\nEvaluating harmful prompts from: " + harmful_prompts_file + "\n")
-    prompts = get_harmful_prompts()
-
-    num_prompts = len(prompts)
-
-    # Check if the prompts are harmful
-    count_harmful = 0
-    start_time = time.time()
-    time_list = []
-    elapsed_time = 0
-    for i in range(num_prompts):
-        prompt = prompts[i]
-        harmful = beam_search_ec(prompt, model, tokenizer, num_iters=num_iters)
-        
-        if harmful:
-            count_harmful += 1
-
-        current_time = time.time()
-        time_list.append(current_time - start_time - elapsed_time)
-        elapsed_time = current_time - start_time
-        time_per_prompt = elapsed_time / (i + 1)
-        percent_harmful = count_harmful / (i + 1) * 100
-        print("    Checking safety... " + progress_bar((i + 1) / num_prompts) \
-            + f' Detected harmful = {percent_harmful:5.1f}%' \
-            + f' Time/prompt = {time_per_prompt:5.1f}s', end="\r", flush=True)
-        
-        if wandb_log:
-            wandb.log({
-                f"percent_harmful_prompt_epoch": percent_harmful,
-                f"time_per_prompt_prompt_epoch": time_per_prompt
-            })
-            
-        print("")
-
-        # Compute standard error of the average time per prompt
-        time_per_prompt_se = torch.tensor(time_list).std().item() / (num_prompts ** 0.5)
-
-        avg_time_per_prompt = np.mean(time_list)
-
-        # Compute standard error of the percentage of harmful prompts
-        percent_harmful_se = (percent_harmful * (100 - percent_harmful) / (num_prompts - 1)) ** 0.5
-
-        if wandb_log:
-            wandb.log({
-                "percent_harmful_standard_error": percent_harmful_se,
-                "time_per_prompt_standard_error": time_per_prompt_se,
-                "avg_time_per_prompt": avg_time_per_prompt
-            })
-
-elif eval_type == "simulated_annealing_ec":
-    # Evaluating the performance of BeamSearchEC on adversarial prompts
-    if not use_classifier:
-        print("Option --use_classifier must be turned on. BeamSearchEC only works with a trained safety classifier.")
-        exit()
-
-    # Harmful prompts
-    print("\nEvaluating harmful prompts from: " + harmful_prompts_file + "\n")
-    prompts = get_harmful_prompts(harmful_prompts_file, mode, phrases, hidden_harmful)
-
-    num_prompts = len(prompts)
-
-    # Check if the prompts are harmful
-    count_harmful = 0
-    start_time = time.time()
-    time_list = []
-    elapsed_time = 0
-    for i in range(num_prompts):
-        prompt = prompts[i]
-        harmful = simulated_annealing_ec(prompt, model, tokenizer, num_iters=num_iters)
-        
-        if harmful:
-            count_harmful += 1
-
-        current_time = time.time()
-        time_list.append(current_time - start_time - elapsed_time)
-        elapsed_time = current_time - start_time
-        time_per_prompt = elapsed_time / (i + 1)
-        percent_harmful = count_harmful / (i + 1) * 100
-        print("    Checking safety... " + progress_bar((i + 1) / num_prompts) \
-            + f' Detected harmful = {percent_harmful:5.1f}%' \
-            + f' Time/prompt = {time_per_prompt:5.1f}s', end="\r", flush=True)
-        
-        if wandb_log:
-            wandb.log({
-                f"percent_harmful_prompt_epoch": percent_harmful,
-                f"time_per_prompt_prompt_epoch": time_per_prompt
-            })
-            
-        print("")
-
-        # Compute standard error of the average time per prompt
-        time_per_prompt_se = torch.tensor(time_list).std().item() / (num_prompts ** 0.5)
-
-        avg_time_per_prompt = np.mean(time_list)
-
         # Compute standard error of the percentage of harmful prompts
         percent_harmful_se = (percent_harmful * (100 - percent_harmful) / (num_prompts - 1)) ** 0.5
 
@@ -486,7 +379,7 @@ elif eval_type == "simulated_annealing_ec":
 elif eval_type == "all_data":
     # Harmful prompts
     print("\nEvaluating harmful prompts from: " + harmful_prompts_file + "\n")
-    harmful_prompts = get_harmful_prompts(harmful_prompts_file, mode, phrases, hidden_harmful)
+    harmful_prompts = get_harmful_prompts(harmful_prompts_file, mode, hidden_harmful, phrases)
 
     num_prompts = len(harmful_prompts)
 

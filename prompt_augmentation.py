@@ -46,7 +46,7 @@ def get_safe_prompts(safe_prompts_file):
             safe_prompts.append(prompt)
     return safe_prompts
 
-def get_harmful_prompts(harmful_prompts_file, mode, hidden_harmful, phrases=None):
+def get_harmful_prompts(harmful_prompts_file, mode, hidden_harmful, phrases):
     """
     Loads the harmful prompts from the text file and returns them. Applies the phrase-augmentated and encapsulation-augmented 
     mode to the prompts if specified.
