@@ -30,7 +30,7 @@ parser.add_argument('--mode', type=str, default="base", choices=["base", "suffix
 parser.add_argument("--hidden_harmful", action="store_true", help="use hidden harmful prompts within safe prompts")
 parser.add_argument('--data_dir', type=str, default="data",
                     help='directory containing the prompts')
-parser.add_argument('--eval_type', type=str, default="ec_all_data", choices=["harmful", "smoothing", "empirical", "greedy_ec", "roc_curve", "ec_all_data", "custom_ec"],
+parser.add_argument('--eval_type', type=str, default="all_data", choices=["all_data", "smoothing", "empirical", "greedy_ec", "roc_curve", "ec_all_data", "custom_ec"],
                     help='type of prompts to evaluate')
 parser.add_argument('--max_erase', type=int, default=20,
                     help='maximum number of tokens to erase')
@@ -156,9 +156,9 @@ if not os.path.exists(results_dir):
     os.makedirs(results_dir)
 
 # Create results file
-if eval_type == "ec_harmful" or eval_type == "empirical":
+if eval_type == "ec_all_data" or eval_type == "empirical":
     results_file = os.path.join(results_dir, f"{eval_type}_{mode}_{num_prompts}.json")
-elif eval_type == "harmful" or eval_type == "smoothing" or eval_type == "grad_ec" or eval_type == "greedy_ec":
+elif eval_type == "all_data" or eval_type == "smoothing" or eval_type == "grad_ec" or eval_type == "greedy_ec":
     results_file = os.path.join(results_dir, f"{eval_type}_{num_prompts}.json")
 elif eval_type == "roc_curve":
     results_file = os.path.join(results_dir, f"{eval_type}_{max_erase}.json")
