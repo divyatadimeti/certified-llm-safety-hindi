@@ -319,6 +319,7 @@ if eval_type == "ec_all_data":
         
     # Compute standard error of the average time per prompt
     time_per_prompt_se = torch.tensor(time_list).std().item() / (len(harmful_prompts) ** 0.5)
+    avg_time_per_prompt = np.mean(time_list)
 
     # Compute standard error of the percentage of harmful prompts
     percent_harmful_se = (percent_harmful * (100 - percent_harmful) / (len(harmful_prompts) - 1)) ** 0.5
@@ -326,7 +327,8 @@ if eval_type == "ec_all_data":
     if wandb_log:
         wandb.log({
             "percent_harmful_standard_error": percent_harmful_se,
-            "time_per_prompt_standard_error_harmful": time_per_prompt_se
+            "time_per_prompt_standard_error_harmful": time_per_prompt_se,
+            "avg_time_per_prompt": avg_time_per_prompt
         })
 
     # Check if the prompts are safe
@@ -361,11 +363,13 @@ if eval_type == "ec_all_data":
                 f"time_per_prompt_prompt_epoch": time_per_prompt
             })
 
+    avg_time_per_prompt = np.mean(avg_time_per_prompt)
     percent_safe = count_safe / len(safe_prompts) * 100
     print(f"Percentage of safe prompts: {percent_safe:.2f}%")
     if wandb_log:
         wandb.log({
-            "percent_safe": percent_safe
+            "percent_safe": percent_safe,
+            "avg_time_per_prompt": avg_time_per_prompt,
         })
 
     # Combine harmful and safe results
@@ -433,13 +437,15 @@ elif eval_type == "greedy_ec":
         # Compute standard error of the average time per prompt
         time_per_prompt_se = torch.tensor(time_list).std().item() / (num_prompts ** 0.5)
 
+        avg_time_per_prompt = np.mean(time_list)
         # Compute standard error of the percentage of harmful prompts
         percent_harmful_se = (percent_harmful * (100 - percent_harmful) / (num_prompts - 1)) ** 0.5
 
         if wandb_log:
             wandb.log({
                 "percent_harmful_standard_error": percent_harmful_se,
-                "time_per_prompt_standard_error": time_per_prompt_se
+                "time_per_prompt_standard_error": time_per_prompt_se,
+                "avg_time_per_prompt": avg_time_per_prompt
             })
 
 elif eval_type == "beam_search_ec":
