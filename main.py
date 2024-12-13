@@ -764,7 +764,6 @@ elif eval_type == "all_data":
         # Evaluating the safety filter gives us certifed safety guarantees on
         # erase_and_check for harmful prompts (from construction).
         harmful = is_harmful(batch, pipeline, tokenizer, llm_name=llm_name, max_llm_sequence_len=max_seq_len)
-        # incorrect_indices = incorrect_indices.extend(np.where(harmful == 0)[0] + (i * batch_size))
         count_harmful += sum(harmful)
         y_pred_harmful.extend(harmful)
         current_time = time.time()
@@ -780,7 +779,6 @@ elif eval_type == "all_data":
             wandb.log({
                 f"percent_harmful_prompt_epoch": percent_harmful,
                 f"time_per_prompt_prompt_epoch": time_per_prompt,
-                f"incorrect_predictions": incorrect_indices
             })
 
         if i + batch_size >= num_prompts:
@@ -803,11 +801,7 @@ elif eval_type == "all_data":
                 wandb.log({
                     f"percent_harmful_prompt_epoch": percent_harmful,
                     f"time_per_prompt_prompt_epoch": time_per_prompt,
-                    f"incorrect_predictions": incorrect_indices
                 })
-
-    print("Harmful prompt indices predicted incorrectly:")
-    # print(incorrect_indices)
 
     print("")
     percent_harmful = count_harmful / num_prompts * 100
@@ -838,7 +832,6 @@ elif eval_type == "all_data":
         # Evaluating the safety filter gives us certifed safety guarantees on
         # erase_and_check for harmful prompts (from construction).
         harmful = is_harmful(batch, pipeline, tokenizer, llm_name=llm_name, max_llm_sequence_len=max_seq_len)
-        # incorrect_indices = incorrect_indices.extend(np.where(harmful == 1)[0] + (i * batch_size))
         count_safe += len(harmful) - sum(harmful)
         y_pred_safe.extend(1 - np.array(harmful))
 
@@ -856,13 +849,11 @@ elif eval_type == "all_data":
                 f"percent_safe_prompt_epoch": percent_safe,
                 f"time_per_prompt_prompt_epoch": time_per_prompt,
             })
-            [wandb.log({f"incorrect_pred{i}": i}) for i in incorrect_indices]
 
         if i + batch_size >= num_prompts:
             # Process the remaining batch
             batch = safe_prompts[i+batch_size:]
             harmful = is_harmful(batch, pipeline, tokenizer, llm_name=llm_name, max_llm_sequence_len=max_seq_len)
-            # incorrect_indices = incorrect_indices.extend(np.where(harmful == 1)[0] + (i * batch_size))
             count_safe += len(harmful) - sum(harmful)
             y_pred_safe.extend(1 - np.array(harmful))
 
@@ -879,10 +870,6 @@ elif eval_type == "all_data":
                     f"percent_safe_prompt_epoch": percent_safe,
                     f"time_per_prompt_prompt_epoch": time_per_prompt,
                 })
-                [wandb.log({f"incorrect_pred{i}": i}) for i in incorrect_indices]
-
-    print("Safe prompt indices predicted incorrectly:")
-    # print(incorrect_indices)
     
     print("")
     percent_safe = count_safe / num_prompts * 100
