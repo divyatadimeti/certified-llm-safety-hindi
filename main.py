@@ -1,14 +1,14 @@
+# Code adapted from the official implementation of Erase-and-Check method:
+# https://github.com/aounon/certified-llm-safety
+
 import torch
 import wandb
 import transformers
 from transformers import AutoTokenizer
-import os
 import time
-import random
 import argparse
 import transformers
 from transformers import DistilBertTokenizer, DistilBertForSequenceClassification, AutoTokenizer, AutoModelForSequenceClassification
-from math import ceil
 import numpy as np
 from sklearn.metrics import f1_score, precision_score, recall_score
 
