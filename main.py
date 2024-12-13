@@ -77,6 +77,8 @@ parser.add_argument('--wandb_entity', type=str, default="patchtst-flashattention
 
 args = parser.parse_args()
 
+np.random.seed(4)
+
 num_prompts = args.num_prompts
 hidden_harmful = args.hidden_harmful
 data_dir = args.data_dir
@@ -284,7 +286,7 @@ def get_harmful_prompts():
     with open(harmful_prompts_file, "r") as f:
         file_prompts = f.readlines()
         harmful_prompts = []
-        phrase = phrases[0]
+        phrase = np.random.choice(phrases)
         for p in file_prompts:
             prompt = p.strip()
             if mode != "base":
