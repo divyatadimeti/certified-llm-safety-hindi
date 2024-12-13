@@ -63,7 +63,7 @@ def get_harmful_prompts(harmful_prompts_file, mode, hidden_harmful, phrases=None
     with open(harmful_prompts_file, "r") as f:
         file_prompts = f.readlines()
         harmful_prompts = []
-        if phrases is not None:
+        if mode != "base":
             phrase = np.random.choice(phrases)
         for p in file_prompts:
             prompt = p.strip()
