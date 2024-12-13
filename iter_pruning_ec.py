@@ -25,8 +25,12 @@ def iterative_pruning_ec(prompt, model, tokenizer, num_iters=20, threshold=0.5, 
 
         # Use tokens_float for model input to ensure gradients are computed
         model_output = model(tokens_float.long())
-        loss = -model_output[0][0, 0]  # Negative of harmful class score
+        loss = -model_output.logits[0, 0]  # Negative of harmful class score
         loss.backward()
+
+        # Check if gradients are computed
+        if tokens_float.grad is None:
+            raise RuntimeError("Gradients were not computed for tokens_float.")
 
         # Find token with smallest gradient magnitude
         token_gradients = tokens_float.grad.abs().sum(dim=-1).squeeze()
@@ -41,7 +45,7 @@ def iterative_pruning_ec(prompt, model, tokenizer, num_iters=20, threshold=0.5, 
 
         # Check if harmful
         model_output = model(tokens)
-        output_softmax = torch.nn.functional.softmax(model_output[0], dim=1)
+        output_softmax = torch.nn.functional.softmax(model_output.logits, dim=1)
         if output_softmax[0, 0].item() > threshold:
             if output_subsequence:
                 return True, tokenizer.decode(tokens, skip_special_tokens=True)
