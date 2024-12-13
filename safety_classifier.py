@@ -160,7 +160,7 @@ loss_fn = nn.CrossEntropyLoss()
 # loss_fn = nn.NLLLoss()
 
 # number of training epochs
-epochs = 10
+epochs = 20
 
 wandb_log = args.wandb_log
 if wandb_log:
