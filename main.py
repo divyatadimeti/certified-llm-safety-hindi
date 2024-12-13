@@ -758,12 +758,13 @@ elif eval_type == "all_data":
     count_harmful = 0
     batch_size = 10
     start_time = time.time()
+    # incorrect_indices = []
     for i in range(0, num_prompts, batch_size):
         batch = harmful_prompts[i:i+batch_size]
         # Evaluating the safety filter gives us certifed safety guarantees on
         # erase_and_check for harmful prompts (from construction).
         harmful = is_harmful(batch, pipeline, tokenizer, llm_name=llm_name, max_llm_sequence_len=max_seq_len)
-        incorrect_indices = np.where(harmful == 0)[0] + (i * batch_size)
+        # incorrect_indices = incorrect_indices.extend(np.where(harmful == 0)[0] + (i * batch_size))
         count_harmful += sum(harmful)
         y_pred_harmful.extend(harmful)
         current_time = time.time()
@@ -786,7 +787,7 @@ elif eval_type == "all_data":
             # Process the remaining batch
             batch = harmful_prompts[i+batch_size:]
             harmful = is_harmful(batch, pipeline, tokenizer, llm_name=llm_name, max_llm_sequence_len=max_seq_len)
-            incorrect_indices = np.where(harmful == 0)[0] + (i * batch_size)
+            # incorrect_indices = incorrect_indices.extend(np.where(harmful == 0)[0] + (i * batch_size))
             count_harmful += sum(harmful)
             y_pred_harmful.extend(harmful)
 
@@ -804,6 +805,9 @@ elif eval_type == "all_data":
                     f"time_per_prompt_prompt_epoch": time_per_prompt,
                     f"incorrect_predictions": incorrect_indices
                 })
+
+    print("Harmful prompt indices predicted incorrectly:")
+    # print(incorrect_indices)
 
     print("")
     percent_harmful = count_harmful / num_prompts * 100
@@ -828,12 +832,13 @@ elif eval_type == "all_data":
     count_safe = 0
     batch_size = 10
     start_time = time.time()
+    # incorrect_indices = []
     for i in range(0, num_prompts, batch_size):
         batch = safe_prompts[i:i+batch_size]
         # Evaluating the safety filter gives us certifed safety guarantees on
         # erase_and_check for harmful prompts (from construction).
         harmful = is_harmful(batch, pipeline, tokenizer, llm_name=llm_name, max_llm_sequence_len=max_seq_len)
-        incorrect_indices = np.where(harmful == 1)[0] + (i * batch_size)
+        # incorrect_indices = incorrect_indices.extend(np.where(harmful == 1)[0] + (i * batch_size))
         count_safe += len(harmful) - sum(harmful)
         y_pred_safe.extend(1 - np.array(harmful))
 
@@ -857,7 +862,7 @@ elif eval_type == "all_data":
             # Process the remaining batch
             batch = safe_prompts[i+batch_size:]
             harmful = is_harmful(batch, pipeline, tokenizer, llm_name=llm_name, max_llm_sequence_len=max_seq_len)
-            incorrect_indices = np.where(harmful == 1)[0] + (i * batch_size)
+            # incorrect_indices = incorrect_indices.extend(np.where(harmful == 1)[0] + (i * batch_size))
             count_safe += len(harmful) - sum(harmful)
             y_pred_safe.extend(1 - np.array(harmful))
 
@@ -876,6 +881,9 @@ elif eval_type == "all_data":
                 })
                 [wandb.log({f"incorrect_pred{i}": i}) for i in incorrect_indices]
 
+    print("Safe prompt indices predicted incorrectly:")
+    # print(incorrect_indices)
+    
     print("")
     percent_safe = count_safe / num_prompts * 100
 
