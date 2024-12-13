@@ -380,15 +380,14 @@ if eval_type == "ec_all_data":
     start_time = time.time()
     time_list = []
     elapsed_time = 0
-    print(len(safe_prompts))
     for i in range(len(safe_prompts)):
         prompt = safe_prompts[i]
         # if args.append_adv: prompt += adv_suffix
-        safe = erase_and_check(prompt, pipeline, tokenizer, max_erase=max_erase, num_adv=num_adv, randomized=randomize,
+        harmful = erase_and_check(prompt, pipeline, tokenizer, max_erase=max_erase, num_adv=num_adv, randomized=randomize,
                                   prompt_sampling_ratio=sampling_ratio, mode=mode, llm_name=llm_name)
         
-        y_pred_safe.append(0 if safe else 1)
-        if safe:
+        y_pred_safe.append(0 if harmful else 1)
+        if not harmful:
             count_safe += 1
 
         current_time = time.time()
@@ -740,29 +739,31 @@ elif eval_type == "smoothing":
                 "certified_accuracy": certified_accuracy[i]
             })
 
-elif eval_type == "harmful":
+elif eval_type == "all_data":
     # Harmful prompts
     print("\nEvaluating harmful prompts from: " + harmful_prompts_file + "\n")
-    prompts = get_harmful_prompts()
+    harmful_prompts = get_harmful_prompts()
 
     # Sample a random subset of the prompts
     if num_prompts > 0:
-        prompts = random.sample(prompts, num_prompts)
+        harmful_prompts = random.sample(harmful_prompts, num_prompts)
     else:
-        num_prompts = len(prompts)
+        num_prompts = len(harmful_prompts)
 
     # Check if the prompts are harmful
+    y_true_harmful = [1] * len(harmful_prompts)
+    y_pred_harmful = []
     count_harmful = 0
     batch_size = 10
     start_time = time.time()
     for i in range(0, num_prompts, batch_size):
-        batch = prompts[i:i+batch_size]
+        batch = harmful_prompts[i:i+batch_size]
         # Evaluating the safety filter gives us certifed safety guarantees on
         # erase_and_check for harmful prompts (from construction).
         harmful = is_harmful(batch, pipeline, tokenizer, llm_name=llm_name, max_llm_sequence_len=max_seq_len)
         incorrect_indices = np.where(harmful == 0)[0] + (i * batch_size)
         count_harmful += sum(harmful)
-
+        y_pred_harmful.extend(harmful)
         current_time = time.time()
         elapsed_time = current_time - start_time
         time_per_prompt = elapsed_time / (i + batch_size)
@@ -781,10 +782,12 @@ elif eval_type == "harmful":
 
         if i + batch_size >= num_prompts:
             # Process the remaining batch
-            batch = prompts[i+batch_size:]
+            batch = harmful_prompts[i+batch_size:]
             harmful = is_harmful(batch, pipeline, tokenizer, llm_name=llm_name, max_llm_sequence_len=max_seq_len)
             incorrect_indices = np.where(harmful == 0)[0] + (i * batch_size)
             count_harmful += sum(harmful)
+            y_pred_harmful.extend(harmful)
+
             current_time = time.time()
             elapsed_time = current_time - start_time
             time_per_prompt = elapsed_time / num_prompts
@@ -806,6 +809,97 @@ elif eval_type == "harmful":
     if wandb_log:
         wandb.log({
             "percent_harmful": percent_harmful
+        })
+    # Safe prompts
+    print("\nEvaluating safe prompts from: " + safe_prompts_file + "\n")
+    safe_prompts = get_safe_prompts()
+
+    # Sample a random subset of the prompts
+    if num_prompts > 0:
+        safe_prompts = random.sample(safe_prompts, num_prompts)
+    else:
+        num_prompts = len(safe_prompts)
+
+    # Check if the prompts are safe
+    y_true_safe = [0] * len(safe_prompts)
+    y_pred_safe = []
+    count_safe = 0
+    batch_size = 10
+    start_time = time.time()
+    for i in range(0, num_prompts, batch_size):
+        batch = safe_prompts[i:i+batch_size]
+        # Evaluating the safety filter gives us certifed safety guarantees on
+        # erase_and_check for harmful prompts (from construction).
+        harmful = is_harmful(batch, pipeline, tokenizer, llm_name=llm_name, max_llm_sequence_len=max_seq_len)
+        incorrect_indices = np.where(harmful == 1)[0] + (i * batch_size)
+        count_safe += len(harmful) - sum(harmful)
+        y_pred_safe.extend(~harmful)
+
+        current_time = time.time()
+        elapsed_time = current_time - start_time
+        time_per_prompt = elapsed_time / (i + batch_size)
+        num_done = i + batch_size
+        percent_safe = count_safe / num_done * 100
+        print("    Checking safety... " + progress_bar(num_done / num_prompts) \
+            + f' Detected safe = {percent_safe:5.1f}%' \
+            + f' Time/prompt = {time_per_prompt:5.1f}s', end="\r", flush=True)
+        
+        if wandb_log:
+            wandb.log({
+                f"percent_safe_prompt_epoch": percent_safe,
+                f"time_per_prompt_prompt_epoch": time_per_prompt,
+                f"incorrect_predictions": incorrect_indices
+            })
+
+        if i + batch_size >= num_prompts:
+            # Process the remaining batch
+            batch = safe_prompts[i+batch_size:]
+            harmful = is_harmful(batch, pipeline, tokenizer, llm_name=llm_name, max_llm_sequence_len=max_seq_len)
+            incorrect_indices = np.where(harmful == 1)[0] + (i * batch_size)
+            count_safe += len(harmful) - sum(harmful)
+            y_pred_safe.extend(~harmful)
+
+            current_time = time.time()
+            elapsed_time = current_time - start_time
+            time_per_prompt = elapsed_time / num_prompts
+            percent_safe = count_safe / num_prompts * 100
+            print("    Checking safety... " + progress_bar(num_done / num_prompts) \
+                + f' Detected safe = {percent_safe:5.1f}%' \
+                + f' Time/prompt = {time_per_prompt:5.1f}s', end="\r", flush=True)
+        
+            if wandb_log:
+                wandb.log({
+                    f"percent_safe_prompt_epoch": percent_safe,
+                    f"time_per_prompt_prompt_epoch": time_per_prompt,
+                    f"incorrect_predictions": incorrect_indices
+                })
+
+    print("")
+    percent_safe = count_safe / num_prompts * 100
+
+    if wandb_log:
+        wandb.log({
+            "percent_safe": percent_safe
+        })
+
+    # Combine harmful and safe results
+    y_true = y_true_harmful + y_true_safe
+    y_pred = y_pred_harmful + y_pred_safe
+
+    # Calculate metrics
+    f1 = f1_score(y_true, y_pred)
+    precision = precision_score(y_true, y_pred)
+    recall = recall_score(y_true, y_pred)
+
+    print(f"\nF1 Score: {f1:.4f}")
+    print(f"Precision: {precision:.4f}")
+    print(f"Recall: {recall:.4f}")
+
+    if wandb_log:
+        wandb.log({
+            "f1_score": f1,
+            "precision": precision,
+            "recall": recall
         })
 
 print("")
