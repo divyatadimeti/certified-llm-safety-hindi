@@ -4,8 +4,6 @@ import transformers
 from transformers import AutoTokenizer
 import os
 import time
-import json
-import ast
 import random
 import argparse
 import transformers
@@ -15,31 +13,22 @@ import numpy as np
 from sklearn.metrics import f1_score, precision_score, recall_score
 
 from defenses import is_harmful
-from defenses import progress_bar, erase_and_check, erase_and_check_smoothing
-from grad_ec import grad_ec
+from defenses import progress_bar, erase_and_check
 from greedy_ec import greedy_ec
-from greedy_grad_ec import greedy_grad_ec
+from beam_search_ec import beam_search_ec
 
 from openai import OpenAI
 
 parser = argparse.ArgumentParser(description='Check safety of prompts.')
-parser.add_argument('--num_prompts', type=int, default=-1,
-                    help='number of prompts to check')
 parser.add_argument('--mode', type=str, default="base", choices=["base", "suffix", "insertion", "prefix"],
                     help='attack mode to defend against')
 parser.add_argument("--hidden_harmful", action="store_true", help="use hidden harmful prompts within safe prompts")
 parser.add_argument('--data_dir', type=str, default="data",
                     help='directory containing the prompts')
-parser.add_argument('--eval_type', type=str, default="all_data", choices=["all_data", "smoothing", "empirical", "greedy_ec", "roc_curve", "ec_all_data", "custom_ec"],
+parser.add_argument('--eval_type', type=str, default="all_data", choices=["all_data", "greedy_ec", "ec_all_data", "beam_search_ec"],
                     help='type of prompts to evaluate')
 parser.add_argument('--max_erase', type=int, default=20,
                     help='maximum number of tokens to erase')
-parser.add_argument('--num_adv', type=int, default=2,
-                    help='number of adversarial prompts to defend against (insertion mode only)')
-parser.add_argument('--attack', type=str, default="gcg", choices=["gcg", "autodan"],
-                    help='attack to defend against')
-parser.add_argument('--adv_prompts_dir', type=str, default="data",
-                    help='directory containing adversarial prompts')
 
 # -- Randomizer arguments -- #
 parser.add_argument('--randomize', action='store_true',
@@ -79,13 +68,11 @@ args = parser.parse_args()
 
 np.random.seed(4)
 
-num_prompts = args.num_prompts
 hidden_harmful = args.hidden_harmful
 data_dir = args.data_dir
 mode = args.mode
 eval_type = args.eval_type
 max_erase = args.max_erase
-num_adv = args.num_adv
 results_dir = args.results_dir
 use_classifier = args.use_classifier
 classifier_name = args.classifier_name
@@ -95,9 +82,6 @@ randomize = args.randomize
 sampling_ratio = args.sampling_ratio
 num_iters = args.num_iters
 llm_name = args.llm_name
-attack = args.attack
-ec_variant = args.ec_variant
-adv_prompts_dir = args.adv_prompts_dir
 wandb_log = args.wandb_log
 wandb_project = args.wandb_project
 wandb_entity = args.wandb_entity
@@ -106,8 +90,6 @@ print("\n* * * * * * Experiment Details * * * * * *")
 if torch.cuda.is_available():
     print("Device: " + torch.cuda.get_device_name(0))
 print("Evaluation type: " + eval_type)
-print("Number of prompts to check: " + str(num_prompts if num_prompts > 0 else "all"))
-# print("Append adversarial prompts? " + str(args.append_adv))
 print("Use randomization? " + str(randomize))
 if randomize:
     print("Sampling ratio: ", str(sampling_ratio))
@@ -119,18 +101,8 @@ else:
 if eval_type == "safe" or eval_type == "empirical":
     print("Mode: " + mode)
     print("Maximum tokens to erase: " + str(max_erase))
-    if mode == "insertion":
-        print("Number of adversarial prompts to defend against: " + str(num_adv))
-elif eval_type == "smoothing" or eval_type == "roc_curve":
-    print("Maximum tokens to erase: " + str(max_erase))
 elif eval_type == "grad_ec" or eval_type == "greedy_ec":
     print("Number of iterations: " + str(num_iters))
-if eval_type == "empirical" or eval_type == "grad_ec" or eval_type == "greedy_ec":
-    print("Attack algorithm: " + attack)
-if eval_type == "roc_curve":
-    print("EC variant: " + ec_variant)
-    print("Adversarial prompts directory: " + adv_prompts_dir)
-print("* * * * * * * * * * ** * * * * * * * * * *\n", flush=True)
 
 # Log the experiment configuration to wandb
 if wandb_log:
@@ -139,9 +111,6 @@ if wandb_log:
         "mode": mode,
         "eval_type": eval_type,
         "max_erase": max_erase,
-        "num_adv": num_adv,
-        "attack": attack,
-        "ec_variant": ec_variant,
         "num_iters": num_iters,
         "randomize": randomize,
         "sampling_ratio": sampling_ratio,
@@ -150,20 +119,11 @@ if wandb_log:
         "model_wt_path": model_wt_path,
         "llm_name": llm_name,
         "max_seq_len": max_seq_len,
-        "adv_prompts_dir": adv_prompts_dir,
         "hidden_harmful": hidden_harmful
     })
 
 if not os.path.exists(results_dir):
     os.makedirs(results_dir)
-
-# Create results file
-if eval_type == "ec_all_data" or eval_type == "empirical":
-    results_file = os.path.join(results_dir, f"{eval_type}_{mode}_{num_prompts}.json")
-elif eval_type == "all_data" or eval_type == "smoothing" or eval_type == "grad_ec" or eval_type == "greedy_ec":
-    results_file = os.path.join(results_dir, f"{eval_type}_{num_prompts}.json")
-elif eval_type == "roc_curve":
-    results_file = os.path.join(results_dir, f"{eval_type}_{max_erase}.json")
 
 if use_classifier:
     # Using custom classifier for safety filter
@@ -233,11 +193,8 @@ else:
 
         # Tokenizer
         model = "meta-llama/Llama-2-7b-chat-hf"
-        # commit_id = "main"        # to use the latest version
-        commit_id = "08751db2aca9bf2f7f80d2e516117a53d7450235"      # to reproduce the results in our paper
+        commit_id = "08751db2aca9bf2f7f80d2e516117a53d7450235"
         tokenizer = AutoTokenizer.from_pretrained(model, revision=commit_id)
-
-        # tokenizer = AutoTokenizer.from_pretrained("gpt2")
 
 if use_classifier:
     print("Using fine-tuned classifier")
@@ -435,79 +392,6 @@ if eval_type == "ec_all_data":
             "recall": recall
         })
 
-elif eval_type == "empirical":
-    # Empirical performance on adversarial prompts
-    if attack == "autodan":
-        range_limit = 1
-    else:
-        range_limit = 21
-    for adv_tok in range(0, range_limit, 2):
-        if attack == "autodan":
-            adv_prompts_file = "data/AutoDAN_prompts.txt"
-        else:
-            adv_prompts_file = "data/adversarial_prompts_t_" + str(adv_tok) + ".txt"
-        print("Evaluating on adversarial prompts from: " + adv_prompts_file)
-        # Load prompts from text file
-        with open(adv_prompts_file, "r") as f:
-            prompts = f.readlines()
-            prompts = [prompt.strip() for prompt in prompts]
-            if attack == "autodan":
-                prompts = [ast.literal_eval(prompt) for prompt in prompts]
-
-        # Sample a random subset of the prompts
-        if num_prompts > 0:
-            prompts = random.sample(prompts, num_prompts)
-        else:
-            num_prompts = len(prompts)
-
-        # Check if the prompts are harmful
-        count_harmful = 0
-        start_time = time.time()
-        time_list = []
-        elapsed_time = 0
-        
-        if attack == "autodan":
-            max_llm_sequence_len = 300
-        else:
-            max_llm_sequence_len = 200
-
-        for i in range(num_prompts):
-            prompt = prompts[i]
-            harmful = erase_and_check(prompt, pipeline, tokenizer, max_erase=max_erase, num_adv=num_adv, randomized=randomize,
-                                    prompt_sampling_ratio=sampling_ratio, mode=mode, max_llm_sequence_len=max_llm_sequence_len)
-            
-            if harmful:
-                count_harmful += 1
-
-            current_time = time.time()
-            time_list.append(current_time - start_time - elapsed_time)
-            elapsed_time = current_time - start_time
-            time_per_prompt = elapsed_time / (i + 1)
-            percent_harmful = count_harmful / (i + 1) * 100
-            print("    Checking safety... " + progress_bar((i + 1) / num_prompts) \
-                + f' Detected harmful = {percent_harmful:5.1f}%' \
-                + f' Time/prompt = {time_per_prompt:5.1f}s', end="\r", flush=True)
-            
-            if wandb_log:
-                wandb.log({
-                    f"percent_harmful_prompt_epoch": percent_harmful,
-                    f"time_per_prompt_prompt_epoch": time_per_prompt
-                })
-            
-        # Compute standard error of the average time per prompt
-        time_per_prompt_se = torch.tensor(time_list).std().item() / (num_prompts ** 0.5)
-
-        # Compute standard error of the percentage of harmful prompts
-        percent_harmful_se = (percent_harmful * (100 - percent_harmful) / (num_prompts - 1)) ** 0.5
-
-        if wandb_log:
-            wandb.log({
-                "percent_harmful_standard_error": percent_harmful_se,
-                "time_per_prompt_standard_error": time_per_prompt_se
-            })
-
-        print("")
-
 elif eval_type == "greedy_ec":
     # Evaluating the performance of GreedyEC on adversarial prompts
     if not use_classifier:
@@ -519,11 +403,7 @@ elif eval_type == "greedy_ec":
     # Load prompts from text file
     prompts = get_harmful_prompts()
 
-    # Sample a random subset of the prompts
-    if num_prompts > 0:
-        prompts = random.sample(prompts, num_prompts)
-    else:
-        num_prompts = len(prompts)
+    num_prompts = len(prompts)
 
     # Check if the prompts are harmful
     count_harmful = 0
@@ -568,187 +448,57 @@ elif eval_type == "greedy_ec":
                 "avg_time_per_prompt": avg_time_per_prompt
             })
 
-elif eval_type == "roc_curve":
-    # ROC curve
+elif eval_type == "beam_search_ec":
+    # Evaluating the performance of BeamSearchEC on adversarial prompts
     if not use_classifier:
-        print("Option --use_classifier must be turned on. GreedyEC only works with a trained safety classifier.")
+        print("Option --use_classifier must be turned on. BeamSearchEC only works with a trained safety classifier.")
         exit()
 
-    # Load adversarial prompts
-    adv_prompts_file = f'{adv_prompts_dir}/adversarial_prompts_t_{max_erase}.txt'
-    print("Evaluating on adversarial prompts from: " + adv_prompts_file)
-
-    with open(adv_prompts_file, "r") as f:
-        adv_prompts = f.readlines()
-        adv_prompts = [prompt.strip() for prompt in adv_prompts]
-    
-    # Sample a random subset of the prompts
-    if num_prompts > 0:
-        adv_prompts = random.sample(adv_prompts, num_prompts)
-    else:
-        num_prompts = len(adv_prompts)
-
-    # Load safe prompts
-    safe_prompts_file = f"{data_dir}/safe_prompts_test.txt"
-    print("Evaluating on safe prompts from: " + safe_prompts_file)
-
-    with open(safe_prompts_file, "r") as f:
-        safe_prompts = f.readlines()
-        safe_prompts = [prompt.strip() for prompt in safe_prompts]
-
-    # Sample a random subset of the prompts
-    if num_prompts > 0:
-        safe_prompts = random.sample(safe_prompts, num_prompts)
-    else:
-        num_prompts = len(safe_prompts)
-
-    print(f"\nEvaluating {ec_variant}...")
-    roc = {
-        "fpr": [0],
-        "tpr": [0]
-    }
-
-    for frac in np.arange(0.0, 1.01, 0.1):
-        print(f"  Fraction = {frac:.2f}")
-
-        # Check if the prompts are harmful
-        count_harmful = 0
-        start_time = time.time()
-        time_list = []
-        elapsed_time = 0
-        for i in range(len(adv_prompts)):
-            prompt = adv_prompts[i]
-            if ec_variant == "RandEC":
-                harmful = erase_and_check(prompt, pipeline, tokenizer, max_erase=2*max_erase,
-                                            randomized=True, prompt_sampling_ratio=frac)
-            elif ec_variant == "GreedyEC":
-                harmful = greedy_ec(prompt, model, tokenizer, num_iters=int(frac*max_erase))
-            elif ec_variant == "GradEC":
-                harmful, _ = grad_ec(prompt, model, tokenizer, model.distilbert.embeddings.word_embeddings,
-                    num_iters=int(2*frac*max_erase))
-            elif ec_variant == "GreedyGradEC":
-                harmful = greedy_grad_ec(prompt, model, tokenizer, model.distilbert.embeddings.word_embeddings,
-                    num_iters=int(2*frac*max_erase))
-            
-            if harmful:
-                count_harmful += 1
-
-            current_time = time.time()
-            time_list.append(current_time - start_time - elapsed_time)
-            elapsed_time = current_time - start_time
-            time_per_prompt = elapsed_time / (i + 1)
-            percent_harmful = count_harmful / (i + 1) * 100
-            print("    Adv Prompts:  " + progress_bar((i + 1) / len(adv_prompts)) \
-                + f' Detected harmful = {percent_harmful:5.1f}%' \
-                + f' Time/prompt = {time_per_prompt:5.1f}s', end="\r", flush=True)
-            
-        print("")
-
-        roc["tpr"].append(percent_harmful)
-
-        # Check if the prompts are harmful
-        count_harmful = 0
-        start_time = time.time()
-        time_list = []
-        elapsed_time = 0
-        for i in range(len(safe_prompts)):
-            prompt = safe_prompts[i]
-            if ec_variant == "RandEC":
-                harmful = erase_and_check(prompt, pipeline, tokenizer, max_erase=2*max_erase,
-                                            randomized=True, prompt_sampling_ratio=frac)
-            elif ec_variant == "GreedyEC":
-                harmful = greedy_ec(prompt, model, tokenizer, num_iters=int(frac*max_erase))
-            elif ec_variant == "GradEC":
-                harmful, _ = grad_ec(prompt, model, tokenizer, model.distilbert.embeddings.word_embeddings,
-                    num_iters=int(2*frac*max_erase))
-            elif ec_variant == "GreedyGradEC":
-                harmful = greedy_grad_ec(prompt, model, tokenizer, model.distilbert.embeddings.word_embeddings,
-                    num_iters=int(2*frac*max_erase))
-
-            if harmful:
-                count_harmful += 1
-
-            current_time = time.time()
-            time_list.append(current_time - start_time - elapsed_time)
-            elapsed_time = current_time - start_time
-            time_per_prompt = elapsed_time / (i + 1)
-            percent_harmful = count_harmful / (i + 1) * 100
-            print("    Safe Prompts: " + progress_bar((i + 1) / len(safe_prompts)) \
-                + f' Detected harmful = {percent_harmful:5.1f}%' \
-                + f' Time/prompt = {time_per_prompt:5.1f}s', end="\r", flush=True)
-            
-        print("")
-
-        roc["fpr"].append(percent_harmful)
-
-    roc["fpr"].append(100)
-    roc["tpr"].append(100)
-
-    if wandb_log:
-        wandb.log(roc)
-
-elif eval_type == "smoothing":
     # Harmful prompts
     print("\nEvaluating harmful prompts from: " + harmful_prompts_file + "\n")
-    # Load prompts from text file
-    with open(harmful_prompts_file, "r") as f:
-        file_prompts = f.readlines()
-        prompts = []
-        for p in file_prompts:
-            prompt = p.strip()
-            if mode != "base":
-                if mode == "prefix":
-                    phrase = np.random.choice(phrases)
-                    prompt = phrase + prompt
-                elif mode == "suffix":
-                    phrase = np.random.choice(phrases)
-                    prompt = prompt + phrase
-                elif mode == "insertion":
-                    phrase = np.random.choice(phrases)
-                    insert_idx = np.random.randint(0, len(prompt))
-                    prompt = prompt[:insert_idx] + phrase + prompt[insert_idx:]
-            prompts.append(prompt)
+    prompts = get_harmful_prompts()
 
-    # Sample a random subset of the prompts
-    if num_prompts > 0:
-        prompts = random.sample(prompts, num_prompts)
-    else:
-        num_prompts = len(prompts)
+    num_prompts = len(prompts)
 
-    # List of certified lengths
-    certified_length = [0] * num_prompts
-
+    # Check if the prompts are harmful
+    count_harmful = 0
     start_time = time.time()
     time_list = []
     elapsed_time = 0
     for i in range(num_prompts):
-        certified_length[i] = erase_and_check_smoothing(prompts[i], pipeline, tokenizer, max_erase=max_erase)
+        prompt = prompts[i]
+        harmful = beam_search_ec(prompt, model, tokenizer, num_iters=num_iters)
+        
+        if harmful:
+            count_harmful += 1
 
         current_time = time.time()
         time_list.append(current_time - start_time - elapsed_time)
         elapsed_time = current_time - start_time
         time_per_prompt = elapsed_time / (i + 1)
-
+        percent_harmful = count_harmful / (i + 1) * 100
+        print("    Checking safety... " + progress_bar((i + 1) / num_prompts) \
+            + f' Detected harmful = {percent_harmful:5.1f}%' \
+            + f' Time/prompt = {time_per_prompt:5.1f}s', end="\r", flush=True)
+        
         if wandb_log:
             wandb.log({
+                f"percent_harmful_prompt_epoch": percent_harmful,
                 f"time_per_prompt_prompt_epoch": time_per_prompt
             })
+            
+        print("")
 
-        # Print progress
-        print("    Evaluating certificates... " + progress_bar((i + 1) / num_prompts), end="\r", flush=True)
+        # Compute standard error of the average time per prompt
+        time_per_prompt_se = torch.tensor(time_list).std().item() / (num_prompts ** 0.5)
 
-    print("")
+        # Compute standard error of the percentage of harmful prompts
+        percent_harmful_se = (percent_harmful * (100 - percent_harmful) / (num_prompts - 1)) ** 0.5
 
-    # List of certified accuracies
-    num_lengths = ceil(max_erase / 2) + 2
-    certified_accuracy = [0] * num_lengths
-
-    for i in range(num_lengths):
-        certified_accuracy[i] = sum([length >= i for length in certified_length]) / num_prompts * 100
         if wandb_log:
             wandb.log({
-                "num_lengths": i,
-                "certified_accuracy": certified_accuracy[i]
+                "percent_harmful_standard_error": percent_harmful_se,
+                "time_per_prompt_standard_error": time_per_prompt_se
             })
 
 elif eval_type == "all_data":
@@ -756,11 +506,7 @@ elif eval_type == "all_data":
     print("\nEvaluating harmful prompts from: " + harmful_prompts_file + "\n")
     harmful_prompts = get_harmful_prompts()
 
-    # Sample a random subset of the prompts
-    if num_prompts > 0:
-        harmful_prompts = random.sample(harmful_prompts, num_prompts)
-    else:
-        num_prompts = len(harmful_prompts)
+    num_prompts = len(harmful_prompts)
 
     # Check if the prompts are harmful
     y_true_harmful = [1] * len(harmful_prompts)
@@ -823,11 +569,7 @@ elif eval_type == "all_data":
     print("\nEvaluating safe prompts from: " + safe_prompts_file + "\n")
     safe_prompts = get_safe_prompts()
 
-    # Sample a random subset of the prompts
-    if num_prompts > 0:
-        safe_prompts = random.sample(safe_prompts, num_prompts)
-    else:
-        num_prompts = len(safe_prompts)
+    num_prompts = len(safe_prompts)
 
     # Check if the prompts are safe
     y_true_safe = [0] * len(safe_prompts)
