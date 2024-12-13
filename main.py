@@ -52,7 +52,7 @@ parser.add_argument('--results_dir', type=str, default="results",
                     help='directory to save results')
 parser.add_argument('--use_classifier', action='store_true',
                     help='flag for using a custom trained safety filter')
-parser.add_argument('--classifier_name', type=str, default="distilbert", choices=["distilbert", "indicbert"],
+parser.add_argument('--classifier_name', type=str, default="distilbert", choices=["distilbert", "distilbert-multi", "indicbert"],
                     help='name of the classifier model')
 parser.add_argument('--model_wt_path', type=str, default="",
                     help='path to the model weights of the trained safety filter')
