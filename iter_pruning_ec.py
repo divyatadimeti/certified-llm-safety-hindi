@@ -23,8 +23,8 @@ def iterative_pruning_ec(prompt, model, tokenizer, num_iters=20, threshold=0.5, 
                 return False, prompt
             return False
 
-        # Calculate gradients
-        model_output = model(tokens)
+        # Use tokens_float for model input to ensure gradients are computed
+        model_output = model(tokens_float.long())
         loss = -model_output[0][0, 0]  # Negative of harmful class score
         loss.backward()
 
