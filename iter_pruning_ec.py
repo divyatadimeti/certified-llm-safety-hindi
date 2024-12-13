@@ -1,10 +1,6 @@
-## Erase and Check via approximate L0 optimization
-## argmax_{mask} loss(prompt \odot mask) s.t. mak has least possible sparsity 
-
 import torch
 from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
 import argparse, time, json, os
-import math
 
 from defenses import progress_bar
 

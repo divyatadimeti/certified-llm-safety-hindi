@@ -16,7 +16,7 @@ from defenses import is_harmful
 from defenses import progress_bar, erase_and_check
 from greedy_ec import greedy_ec
 from beam_search_ec import beam_search_ec
-
+from iter_pruning_ec import iterative_pruning_ec
 from openai import OpenAI
 
 parser = argparse.ArgumentParser(description='Check safety of prompts.')
@@ -25,7 +25,7 @@ parser.add_argument('--mode', type=str, default="base", choices=["base", "suffix
 parser.add_argument("--hidden_harmful", action="store_true", help="use hidden harmful prompts within safe prompts")
 parser.add_argument('--data_dir', type=str, default="data",
                     help='directory containing the prompts')
-parser.add_argument('--eval_type', type=str, default="all_data", choices=["all_data", "greedy_ec", "ec_all_data", "beam_search_ec"],
+parser.add_argument('--eval_type', type=str, default="all_data", choices=["all_data", "greedy_ec", "ec_all_data", "beam_search_ec", "iter_pruning_ec"],
                     help='type of prompts to evaluate')
 parser.add_argument('--max_erase', type=int, default=20,
                     help='maximum number of tokens to erase')
@@ -462,6 +462,59 @@ elif eval_type == "beam_search_ec":
     for i in range(num_prompts):
         prompt = prompts[i]
         harmful = beam_search_ec(prompt, model, tokenizer, num_iters=num_iters)
+        
+        if harmful:
+            count_harmful += 1
+
+        current_time = time.time()
+        time_list.append(current_time - start_time - elapsed_time)
+        elapsed_time = current_time - start_time
+        time_per_prompt = elapsed_time / (i + 1)
+        percent_harmful = count_harmful / (i + 1) * 100
+        print("    Checking safety... " + progress_bar((i + 1) / num_prompts) \
+            + f' Detected harmful = {percent_harmful:5.1f}%' \
+            + f' Time/prompt = {time_per_prompt:5.1f}s', end="\r", flush=True)
+        
+        if wandb_log:
+            wandb.log({
+                f"percent_harmful_prompt_epoch": percent_harmful,
+                f"time_per_prompt_prompt_epoch": time_per_prompt
+            })
+            
+        print("")
+
+        # Compute standard error of the average time per prompt
+        time_per_prompt_se = torch.tensor(time_list).std().item() / (num_prompts ** 0.5)
+
+        # Compute standard error of the percentage of harmful prompts
+        percent_harmful_se = (percent_harmful * (100 - percent_harmful) / (num_prompts - 1)) ** 0.5
+
+        if wandb_log:
+            wandb.log({
+                "percent_harmful_standard_error": percent_harmful_se,
+                "time_per_prompt_standard_error": time_per_prompt_se
+            })
+
+elif eval_type == "iter_pruning_ec":
+    # Evaluating the performance of BeamSearchEC on adversarial prompts
+    if not use_classifier:
+        print("Option --use_classifier must be turned on. BeamSearchEC only works with a trained safety classifier.")
+        exit()
+
+    # Harmful prompts
+    print("\nEvaluating harmful prompts from: " + harmful_prompts_file + "\n")
+    prompts = get_harmful_prompts()
+
+    num_prompts = len(prompts)
+
+    # Check if the prompts are harmful
+    count_harmful = 0
+    start_time = time.time()
+    time_list = []
+    elapsed_time = 0
+    for i in range(num_prompts):
+        prompt = prompts[i]
+        harmful = iterative_pruning_ec(prompt, model, tokenizer, num_iters=num_iters)
         
         if harmful:
             count_harmful += 1
