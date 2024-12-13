@@ -30,7 +30,7 @@ parser.add_argument('--mode', type=str, default="base", choices=["base", "suffix
 parser.add_argument("--hidden_harmful", action="store_true", help="use hidden harmful prompts within safe prompts")
 parser.add_argument('--data_dir', type=str, default="data",
                     help='directory containing the prompts')
-parser.add_argument('--eval_type', type=str, default="ec_all_data", choices=["harmful", "smoothing", "empirical", "grad_ec", "greedy_ec", "roc_curve", "ec_all_data"],
+parser.add_argument('--eval_type', type=str, default="ec_all_data", choices=["harmful", "smoothing", "empirical", "greedy_ec", "roc_curve", "ec_all_data", "custom_ec"],
                     help='type of prompts to evaluate')
 parser.add_argument('--max_erase', type=int, default=20,
                     help='maximum number of tokens to erase')
@@ -40,10 +40,6 @@ parser.add_argument('--attack', type=str, default="gcg", choices=["gcg", "autoda
                     help='attack to defend against')
 parser.add_argument('--adv_prompts_dir', type=str, default="data",
                     help='directory containing adversarial prompts')
-
-# use adversarial prompt or not
-# parser.add_argument('--append-adv', action='store_true',
-#                     help="Append adversarial prompt")
 
 # -- Randomizer arguments -- #
 parser.add_argument('--randomize', action='store_true',
@@ -502,7 +498,7 @@ elif eval_type == "empirical":
             })
 
         print("")
-        
+
 elif eval_type == "greedy_ec":
     # Evaluating the performance of GreedyEC on adversarial prompts
     if not use_classifier:
@@ -780,7 +776,27 @@ elif eval_type == "harmful":
                 f"percent_harmful_prompt_epoch": percent_harmful,
                 f"time_per_prompt_prompt_epoch": time_per_prompt
             })
+
+        if i + batch_size >= num_prompts:
+            # Process the remaining batch
+            batch = prompts[i+batch_size:]
+            harmful = is_harmful(batch, pipeline, tokenizer, llm_name=llm_name, max_llm_sequence_len=max_seq_len)
+            count_harmful += sum(harmful)
+            current_time = time.time()
+            elapsed_time = current_time - start_time
+            time_per_prompt = elapsed_time / num_prompts
+            percent_harmful = count_harmful / num_prompts * 100
+            print("    Checking safety... " + progress_bar(num_done / num_prompts) \
+                + f' Detected harmful = {percent_harmful:5.1f}%' \
+                + f' Time/prompt = {time_per_prompt:5.1f}s', end="\r", flush=True)
         
+            if wandb_log:
+                wandb.log({
+                    f"percent_harmful_prompt_epoch": percent_harmful,
+                    f"time_per_prompt_prompt_epoch": time_per_prompt
+                })
+
+    print("")
     percent_harmful = count_harmful / num_prompts * 100
 
     if wandb_log:
