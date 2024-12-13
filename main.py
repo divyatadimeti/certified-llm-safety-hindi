@@ -185,7 +185,7 @@ else:
     insertion_file = f"{data_dir}/insertion.txt"
 
 if mode != "base":
-    phrases = get_phrases()
+    phrases = get_phrases(mode, prefsuffix_file, insertion_file)
 
 if eval_type == "ec_all_data":
     # Check the mode
