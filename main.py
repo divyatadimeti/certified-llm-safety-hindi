@@ -284,17 +284,15 @@ def get_harmful_prompts():
     with open(harmful_prompts_file, "r") as f:
         file_prompts = f.readlines()
         harmful_prompts = []
+        phrase = phrases[0]
         for p in file_prompts:
             prompt = p.strip()
             if mode != "base":
                 if mode == "prefix":
-                    phrase = np.random.choice(phrases)
                     prompt = phrase + prompt
                 elif mode == "suffix":
-                    phrase = np.random.choice(phrases)
                     prompt = prompt + phrase
                 elif mode == "insertion":
-                    phrase = np.random.choice(phrases)
                     insert_idx = np.random.randint(0, len(prompt))
                     prompt = prompt[:insert_idx] + phrase + prompt[insert_idx:]
             if hidden_harmful:
