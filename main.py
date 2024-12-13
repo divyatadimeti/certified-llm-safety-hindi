@@ -62,7 +62,6 @@ data_dir = args.data_dir
 mode = args.mode
 eval_type = args.eval_type
 max_erase = args.max_erase
-results_dir = args.results_dir
 use_classifier = args.use_classifier
 classifier_name = args.classifier_name
 model_wt_path = args.model_wt_path
@@ -101,9 +100,6 @@ if wandb_log:
         "max_seq_len": max_seq_len,
         "hidden_harmful": hidden_harmful
     })
-
-if not os.path.exists(results_dir):
-    os.makedirs(results_dir)
 
 if use_classifier:
     # Using custom classifier for safety filter
