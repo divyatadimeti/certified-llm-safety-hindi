@@ -166,10 +166,12 @@ elif eval_type == "roc_curve":
 if use_classifier:
     # Using custom classifier for safety filter
     # Load model and tokenizer
-    if classifier_name == "distilbert":
+    if classifier_name == "distilbert-multi":
         tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-multilingual-cased')
         model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-multilingual-cased')
-       
+    elif classifier_name == "distilbert":
+        tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
+        model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-uncased')
     elif classifier_name == "indicbert":
         tokenizer = transformers.AutoTokenizer.from_pretrained('ai4bharat/indic-bert', keep_accents=True)
         model = AutoModelForSequenceClassification.from_pretrained('ai4bharat/indic-bert')

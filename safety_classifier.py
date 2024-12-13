@@ -73,6 +73,12 @@ if args.classifier_name == "distilbert":
     # Load the model
     model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-uncased')
 
+elif args.classifier_name == "distilbert-multi":
+    # Load the tokenizer
+    tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-multilingual-cased')
+    # Load the model
+    model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-multilingual-cased')
+
 elif args.classifier_name == "indicbert":
     # Load the tokenizer
     tokenizer = transformers.AutoTokenizer.from_pretrained('ai4bharat/indic-bert', keep_accents=True)
