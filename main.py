@@ -851,7 +851,7 @@ elif eval_type == "all_data":
                 f"percent_safe_prompt_epoch": percent_safe,
                 f"time_per_prompt_prompt_epoch": time_per_prompt,
             })
-            [wandb.log({f"incorrect_pred{i}": incorrect_indices}) for i in incorrect_indices]
+            [wandb.log({f"incorrect_pred{i}": i}) for i in incorrect_indices]
 
         if i + batch_size >= num_prompts:
             # Process the remaining batch
@@ -874,7 +874,7 @@ elif eval_type == "all_data":
                     f"percent_safe_prompt_epoch": percent_safe,
                     f"time_per_prompt_prompt_epoch": time_per_prompt,
                 })
-                [wandb.log({f"incorrect_pred{i}": incorrect_indices}) for i in incorrect_indices]
+                [wandb.log({f"incorrect_pred{i}": i}) for i in incorrect_indices]
 
     print("")
     percent_safe = count_safe / num_prompts * 100
