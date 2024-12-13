@@ -492,13 +492,16 @@ elif eval_type == "beam_search_ec":
         # Compute standard error of the average time per prompt
         time_per_prompt_se = torch.tensor(time_list).std().item() / (num_prompts ** 0.5)
 
+        avg_time_per_prompt = np.mean(time_list)
+
         # Compute standard error of the percentage of harmful prompts
         percent_harmful_se = (percent_harmful * (100 - percent_harmful) / (num_prompts - 1)) ** 0.5
 
         if wandb_log:
             wandb.log({
                 "percent_harmful_standard_error": percent_harmful_se,
-                "time_per_prompt_standard_error": time_per_prompt_se
+                "time_per_prompt_standard_error": time_per_prompt_se,
+                "avg_time_per_prompt": avg_time_per_prompt
             })
 
 elif eval_type == "simulated_annealing_ec":
@@ -545,13 +548,16 @@ elif eval_type == "simulated_annealing_ec":
         # Compute standard error of the average time per prompt
         time_per_prompt_se = torch.tensor(time_list).std().item() / (num_prompts ** 0.5)
 
+        avg_time_per_prompt = np.mean(time_list)
+
         # Compute standard error of the percentage of harmful prompts
         percent_harmful_se = (percent_harmful * (100 - percent_harmful) / (num_prompts - 1)) ** 0.5
 
         if wandb_log:
             wandb.log({
                 "percent_harmful_standard_error": percent_harmful_se,
-                "time_per_prompt_standard_error": time_per_prompt_se
+                "time_per_prompt_standard_error": time_per_prompt_se,
+                "avg_time_per_prompt": avg_time_per_prompt
             })
 
 elif eval_type == "all_data":
