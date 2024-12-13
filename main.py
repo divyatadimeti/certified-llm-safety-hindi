@@ -289,20 +289,20 @@ def get_harmful_prompts():
         phrase = np.random.choice(phrases)
         for p in file_prompts:
             prompt = p.strip()
-            if mode != "base":
-                if mode == "prefix":
-                    prompt = phrase + prompt
-                elif mode == "suffix":
-                    prompt = prompt + phrase
-                elif mode == "insertion":
-                    insert_idx = np.random.randint(0, len(prompt))
-                    prompt = prompt[:insert_idx] + phrase + prompt[insert_idx:]
             if hidden_harmful:
                 safe_prompts = get_safe_prompts()
                 sel_safe_prompts = random.sample(safe_prompts, 2)
                 padded_prompt = sel_safe_prompts[0] + prompt + sel_safe_prompts[1]
                 harmful_prompts.append(padded_prompt)
             else:
+                if mode != "base":
+                    if mode == "prefix":
+                        prompt = phrase + prompt
+                    elif mode == "suffix":
+                        prompt = prompt + phrase
+                    elif mode == "insertion":
+                        insert_idx = np.random.randint(0, len(prompt))
+                        prompt = prompt[:insert_idx] + phrase + prompt[insert_idx:]
                 harmful_prompts.append(prompt)
     return harmful_prompts
 
