@@ -31,7 +31,7 @@ parser.add_argument('--eval_type', type=str, default="all_data", choices=["all_d
                     help='type of prompts to evaluate')
 parser.add_argument('--max_erase', type=int, default=20,
                     help='maximum number of tokens to erase')
-parser.add_argument('--num_iters', type=float, default=0.1,
+parser.add_argument('--num_iters', type=float, default=10,
                     help='number of iterations for the Erase-and-Check procedure for GreedyEC')
 # -- Safety Classifier arguments -- #
 parser.add_argument('--use_classifier', action='store_true',
