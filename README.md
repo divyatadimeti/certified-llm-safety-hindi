@@ -34,9 +34,19 @@ conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvi
 pip install -r requirements.txt
 ```
 
-## Training the Safety Classifiers
+## Fine-tune the Safety Classifiers
 
-![Train and Validation Loss](train_val_loss.png)
+To fine-tune a safety classifiers, run the following:
+
+###### This command loads the pretrained DistilBERT-multilingual-cased model from HF and fine-tunes it on the harmful data.
+```bash
+python safety_classifier.py --classifier_name distilbert-multi --data_dir hindi_data/hindi --epochs 10 --save_path models/distilbert-multi
+```
+You can similarly fine-tune IndicBERT by replacing **`distilbert-multi`** with **`indicbert`**.
+
+Below is a plot of the train and validation loss curves we attain by fine-tuning both of these pretrained models. 
+ 
+<img src="train_val_loss.png" alt="Train and Validation Loss" width="400">
 
 ## Basic Inference on Safety Classifiers
 We perform inference on both LLama2 and fine-tuned safety classifiers, loaded from model paths.
