@@ -905,7 +905,7 @@ elif eval_type == "all_data":
         })
     
     # Log the total accuracy
-    total_accuracy = (count_harmful + count_safe) / num_prompts * 100
+    total_accuracy = (count_harmful + count_safe) / len(safe_prompts + harmful_prompts) * 100
     if wandb_log:
         wandb.log({
             "total_accuracy": total_accuracy
