@@ -903,6 +903,13 @@ elif eval_type == "all_data":
             "precision": precision,
             "recall": recall
         })
+    
+    # Log the total accuracy
+    total_accuracy = (count_harmful + count_safe) / num_prompts * 100
+    if wandb_log:
+        wandb.log({
+            "total_accuracy": total_accuracy
+        })
 
 print("")
 
