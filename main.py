@@ -308,21 +308,7 @@ def get_harmful_prompts():
 
 if eval_type == "ec_all_data":
     # Check the mode
-    if mode != "base":
-        print(f"Evaluating with mode: {mode}")
-        if mode == "prefix":
-            phrases_file = prefsuffix_file
-        elif mode == "suffix":
-            phrases_file = prefsuffix_file
-        elif mode == "insertion":
-            phrases_file = insertion_file
-        else:
-            raise ValueError("Invalid mode: " + mode)
-        
-        # Load phrases from text file
-        with open(phrases_file, "r") as f:
-            phrases = f.readlines()
-            phrases = [phrase.strip() for phrase in phrases]
+    print(f"Evaluating with mode: {mode}")
 
     # Harmful prompts
     print("\nEvaluating harmful prompts from: " + harmful_prompts_file + "\n")
@@ -365,6 +351,13 @@ if eval_type == "ec_all_data":
                 f"percent_harmful_prompt_epoch": percent_harmful,
                 f"time_per_prompt_prompt_epoch": time_per_prompt
             })
+
+    percent_harmful = count_harmful / len(harmful_prompts) * 100
+    print(f"Percentage of harmful prompts: {percent_harmful:.2f}%")
+    if wandb_log:
+        wandb.log({
+            "percent_harmful": percent_harmful
+        })
         
     # Compute standard error of the average time per prompt
     time_per_prompt_se = torch.tensor(time_list).std().item() / (len(harmful_prompts) ** 0.5)
@@ -409,6 +402,13 @@ if eval_type == "ec_all_data":
                 f"percent_safe_prompt_epoch": percent_harmful,
                 f"time_per_prompt_prompt_epoch": time_per_prompt
             })
+
+    percent_safe = count_safe / len(safe_prompts) * 100
+    print(f"Percentage of safe prompts: {percent_safe:.2f}%")
+    if wandb_log:
+        wandb.log({
+            "percent_safe": percent_safe
+        })
 
     # Combine harmful and safe results
     y_true = y_true_harmful + y_true_safe
